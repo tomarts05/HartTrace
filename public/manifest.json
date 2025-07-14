@@ -1,0 +1,46 @@
+{
+  "name": "Connect the Dots - Puzzle Game",
+  "short_name": "Puzzle Game",
+  "description": "Challenge your mind with this addictive puzzle game! Connect numbered dots in order while filling every cell.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "theme_color": "#0ea5e9",
+  "background_color": "#0f172a",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["games", "puzzle", "entertainment"],
+  "icons": [
+    {
+      "src": "/fb/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fb/icon-512.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/fb/share-image.svg",
+      "sizes": "1200x630",
+      "type": "image/svg+xml",
+      "label": "Puzzle game screenshot"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Game",
+      "url": "/?action=new",
+      "description": "Start a new puzzle game"
+    },
+    {
+      "name": "Play on Facebook",
+      "url": "/instagram.html",
+      "description": "Play with friends on Facebook"
+    }
+  ]
+}

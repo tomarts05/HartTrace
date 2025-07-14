@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Puzzle Game - Play on Facebook</title>
+    
+    <!-- Instagram/Social Media Optimization -->
+    <meta property="og:title" content="🧩 Connect the Dots - Puzzle Game">
+    <meta property="og:description" content="Challenge your mind! Connect numbered dots in order while filling every cell. Compete with friends on Facebook!">
+    <meta property="og:image" content="/fb/share-image.svg">
+    <meta property="og:url" content="https://your-domain.com/instagram">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Puzzle Game">
+    
+    <!-- Instagram specific -->
+    <meta property="instagram:title" content="🧩 Connect the Dots">
+    <meta property="instagram:description" content="Addictive puzzle game! Can you connect all the dots?">
+    <meta property="instagram:image" content="/fb/share-image.svg">
+    
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="🧩 Connect the Dots - Puzzle Game">
+    <meta name="twitter:description" content="Challenge your mind! Connect numbered dots in order while filling every cell.">
+    <meta name="twitter:image" content="/fb/share-image.svg">
+    
+    <!-- Mobile optimization -->
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        .glow {
+            box-shadow: 0 0 30px rgba(14, 165, 233, 0.3);
+        }
+        .pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes pulse-glow {
+            from { box-shadow: 0 0 20px rgba(14, 165, 233, 0.3); }
+            to { box-shadow: 0 0 40px rgba(14, 165, 233, 0.6); }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden">
+    
+    <!-- Background decoration -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute top-20 left-20 w-32 h-32 bg-blue-500 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-20 right-20 w-40 h-40 bg-cyan-500 rounded-full blur-3xl"></div>
+        <div class="absolute top-1/2 left-1/2 w-60 h-60 bg-purple-500 rounded-full blur-3xl transform -translate-x-1/2 -translate-y-1/2"></div>
+    </div>
+    
+    <!-- Main content -->
+    <div class="relative z-10 max-w-md w-full text-center">
+        
+        <!-- Game logo/icon -->
+        <div class="mb-8">
+            <div class="w-24 h-24 mx-auto bg-slate-800 rounded-2xl p-4 glow">
+                <svg viewBox="0 0 512 512" class="w-full h-full">
+                    <circle cx="256" cy="200" r="80" fill="#0ea5e9"/>
+                    <text x="256" y="220" text-anchor="middle" fill="white" font-size="48" font-weight="bold">1</text>
+                    <circle cx="356" cy="300" r="60" fill="#22d3ee"/>
+                    <text x="356" y="315" text-anchor="middle" fill="white" font-size="36" font-weight="bold">2</text>
+                    <path d="M 176 280 L 296 280 L 356 240" stroke="#0ea5e9" stroke-width="8" fill="none" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+        
+        <!-- Title -->
+        <h1 class="text-4xl font-black text-white mb-4">
+            🧩 Connect the Dots
+        </h1>
+        
+        <!-- Subtitle -->
+        <p class="text-xl text-slate-300 mb-6 leading-relaxed">
+            Challenge your mind with this addictive puzzle game!
+        </p>
+        
+        <!-- Features -->
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-slate-700">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="flex items-center gap-2 text-green-400">
+                    <span class="text-lg">🎯</span>
+                    <span>12 Stages</span>
+                </div>
+                <div class="flex items-center gap-2 text-blue-400">
+                    <span class="text-lg">🏆</span>
+                    <span>Leaderboards</span>
+                </div>
+                <div class="flex items-center gap-2 text-purple-400">
+                    <span class="text-lg">👥</span>
+                    <span>Share & Compete</span>
+                </div>
+                <div class="flex items-center gap-2 text-yellow-400">
+                    <span class="text-lg">⚡</span>
+                    <span>Instant Play</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- How to play -->
+        <div class="text-left mb-8 bg-slate-900/30 rounded-xl p-4">
+            <h3 class="text-lg font-bold text-white mb-3">📋 How to Play:</h3>
+            <ol class="text-sm text-slate-300 space-y-2">
+                <li>1. Connect dots in numerical order (1→2→3...)</li>
+                <li>2. Your path must fill every cell on the grid</li>
+                <li>3. Complete all 12 stages to become a master!</li>
+            </ol>
+        </div>
+        
+        <!-- Main CTA Button -->
+        <button 
+            onclick="openFacebookGame()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl text-lg transition-all duration-300 transform hover:scale-105 pulse-glow mb-4"
+        >
+            🚀 Play on Facebook
+        </button>
+        
+        <!-- Secondary CTA -->
+        <button 
+            onclick="window.open('./', '_blank')"
+            class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-6 rounded-xl text-base transition-all duration-300"
+        >
+            🌐 Play Web Version
+        </button>
+        
+        <!-- Footer -->
+        <div class="mt-8 text-xs text-slate-500 text-center">
+            <p>🎮 Best experienced on Facebook with friends!</p>
+            <p class="mt-1">📱 Optimized for mobile devices</p>
+        </div>
+        
+    </div>
+    
+    <!-- Installation prompt for PWA -->
+    <div id="pwaPrompt" class="fixed bottom-4 left-4 right-4 bg-slate-800 border border-slate-600 rounded-xl p-4 text-center hidden">
+        <p class="text-white text-sm mb-3">📱 Install this game for the best experience!</p>
+        <div class="flex gap-2">
+            <button onclick="installPWA()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-semibold">
+                Install
+            </button>
+            <button onclick="dismissPWA()" class="bg-slate-600 text-white py-2 px-4 rounded-lg text-sm">
+                Maybe Later
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Facebook Instant Game launcher
+        function openFacebookGame() {
+            // Replace with your actual Facebook Instant Game URL
+            const fbGameUrl = 'https://fb.gg/your-game-id';
+            
+            // Try to open in Facebook app if on mobile
+            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                // Try Facebook app deep link first
+                window.location.href = 'fb://instantgames/your-game-id';
+                
+                // Fallback to web version after a delay
+                setTimeout(() => {
+                    window.open(fbGameUrl, '_blank');
+                }, 1000);
+            } else {
+                // Desktop - open in new tab
+                window.open(fbGameUrl, '_blank');
+            }
+            
+            // Analytics tracking
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'click', {
+                    'event_category': 'Game Launch',
+                    'event_label': 'Facebook Instant Game'
+                });
+            }
+        }
+        
+        // PWA Installation
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('pwaPrompt').classList.remove('hidden');
+        });
+        
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    }
+                    deferredPrompt = null;
+                    dismissPWA();
+                });
+            }
+        }
+        
+        function dismissPWA() {
+            document.getElementById('pwaPrompt').classList.add('hidden');
+            localStorage.setItem('pwaDismissed', 'true');
+        }
+        
+        // Auto-dismiss if previously dismissed
+        if (localStorage.getItem('pwaDismissed')) {
+            document.getElementById('pwaPrompt').classList.add('hidden');
+        }
+        
+        // Animate elements on load
+        window.addEventListener('load', () => {
+            document.body.style.opacity = '0';
+            document.body.style.transform = 'translateY(20px)';
+            document.body.style.transition = 'all 0.6s ease';
+            
+            setTimeout(() => {
+                document.body.style.opacity = '1';
+                document.body.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    </script>
+
+</body>
+</html>
