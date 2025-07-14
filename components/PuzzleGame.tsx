@@ -4,6 +4,7 @@ import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution } from '../data/puzzl
 import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
+import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
 
 type Path = { from: number; to: number; cells: string[] };
 
@@ -20,6 +21,12 @@ interface PointEvent {
 }
 
 export const PuzzleGame: React.FC = () => {
+  // Performance optimization settings
+  const reducedAnimations = shouldReduceAnimations();
+  const performanceMode = getPerformanceMode();
+  const maxPenPoints = performanceMode === 'low' ? 20 : performanceMode === 'medium' ? 35 : 50;
+  const penUpdateFrequency = performanceMode === 'low' ? 5 : performanceMode === 'medium' ? 4 : 3;
+  
   // Facebook Instant Games integration
   const [fbState, fbActions] = useFBInstant();
   
@@ -628,12 +635,12 @@ export const PuzzleGame: React.FC = () => {
         
         // Add point to pen path for smooth curve drawing (use ref for performance)
         penPathRef.current.push({ x: svgX, y: svgY });
-        // Keep only last 50 points for performance (reduced from 100)
-        if (penPathRef.current.length > 50) {
-          penPathRef.current = penPathRef.current.slice(-50);
+        // Keep only last N points for performance (optimized based on device capability)
+        if (penPathRef.current.length > maxPenPoints) {
+          penPathRef.current = penPathRef.current.slice(-maxPenPoints);
         }
-        // Trigger re-render less frequently for better performance (reduced logging)
-        if (penPathRef.current.length % 3 === 0) {
+        // Trigger re-render less frequently for better performance (optimized based on device)
+        if (penPathRef.current.length % penUpdateFrequency === 0) {
           setPenPathUpdate(prev => prev + 1);
         }
       } catch (error) {
@@ -973,19 +980,19 @@ export const PuzzleGame: React.FC = () => {
             <circle r="20" fill="none" stroke="#10b981" strokeWidth="3" opacity="0.6" />
           )}
           {isEnd && (
-            <circle r="20" fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" />
+            <circle r="20" fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.6" strokeDasharray="5,5" className={reducedAnimations ? "" : "animate-pulse"} />
           )}
           
           <circle r="15" fill={isConnected ? '#0ea5e9' : '#1e293b'} className="transition-colors"/>
           
           {/* Pulsing indicator for next dot */}
           {isNext && gameState !== GAME_STATE.WON && (
-            <circle r="18" fill="none" stroke="#22d3ee" strokeWidth="2" className="animate-pulse" />
+            <circle r="18" fill="none" stroke="#22d3ee" strokeWidth="2" className={reducedAnimations ? "" : "animate-pulse"} />
           )}
           
           {/* Extra visual indicator for the current target dot */}
           {isNext && gameState !== GAME_STATE.WON && !isDrawing && (
-            <circle r="25" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.5" className="animate-ping" />
+            <circle r="25" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.5" className={reducedAnimations ? "" : "animate-ping"} />
           )}
           
           {/* Number with special styling for start and end */}
@@ -1081,9 +1088,10 @@ export const PuzzleGame: React.FC = () => {
       <AnimatePresence>
         {notification && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            initial={reducedAnimations ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.9 }}
+            animate={reducedAnimations ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={reducedAnimations ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.9 }}
+            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
             className={`notification ${notification.type}`}
           >
             {notification.message}
@@ -1176,7 +1184,7 @@ export const PuzzleGame: React.FC = () => {
         <div className="game-board-container">
           <svg
             ref={svgRef}
-            className={`game-board ${isDrawing ? 'drawing' : ''}`}
+            className={`game-board game-svg ${isDrawing ? 'drawing' : ''}`}
             onMouseDown={handleInteractionStart}
             onTouchStart={handleInteractionStart}
             style={{ touchAction: 'none', aspectRatio: '1/1' }}
@@ -1323,13 +1331,15 @@ export const PuzzleGame: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
             className="victory-overlay"
             onClick={() => setShowProgressSummary(false)}
           >
             <motion.div
-              initial={{ scale: 0.8, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 20 }}
+              initial={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
+              animate={reducedAnimations ? { opacity: 1 } : { scale: 1, y: 0 }}
+              exit={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
+              transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
               className="victory-content"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1442,12 +1452,14 @@ export const PuzzleGame: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
             className="victory-overlay"
           >
             <motion.div
-              initial={{ scale: 0.8, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 20 }}
+              initial={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
+              animate={reducedAnimations ? { opacity: 1 } : { scale: 1, y: 0 }}
+              exit={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
+              transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
               className="victory-content"
             >
               {/* Dynamic victory celebration based on completion level */}
