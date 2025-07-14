@@ -21,7 +21,6 @@ jobs:
     - name: Deploy to Homelab Server
       run: |
          ssh -o StrictHostKeyChecking=no tomarts05@ssh.hartash.com << 'EOF'
-            echo "✅ Connected to Homelab Server"
           set -e
 
           TARGET_DIR="/var/www/hart.game"
