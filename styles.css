@@ -161,9 +161,36 @@ body::before {
   }
 }
 
-.animate-spin { animation: spin 1s linear infinite; }
-.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-.animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.animate-spin { 
+  animation: spin 1s linear infinite; 
+  will-change: transform;
+}
+.animate-pulse { 
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; 
+  will-change: opacity;
+}
+.animate-ping { 
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; 
+  will-change: transform, opacity;
+}
+
+/* Performance-optimized animations for mobile */
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+  .animate-pulse { 
+    animation: pulse 3s ease-in-out infinite; /* Slower animation */
+  }
+  .animate-ping { 
+    animation: ping 2s ease-in-out infinite; /* Slower animation */
+  }
+  
+  /* Disable heavy animations on very low-end devices */
+  @media (max-width: 480px) {
+    .animate-ping {
+      animation: none;
+      opacity: 0.7;
+    }
+  }
+}
 
 /* Game Container */
 .game-container {
@@ -1235,6 +1262,7 @@ body::before {
   animation: pen-draw 0.3s ease-out;
   stroke-linecap: round;
   stroke-linejoin: round;
+  will-change: stroke-dasharray, opacity;
 }
 
 /* Enhanced tip path animation */
@@ -1245,6 +1273,24 @@ body::before {
 
 .tip-path-animated {
   animation: tip-flow 2s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+/* Performance optimizations for mobile */
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+  .pen-path {
+    animation: pen-draw 0.5s ease-out; /* Slightly slower */
+  }
+  
+  .tip-path-animated {
+    animation: tip-flow 3s linear infinite; /* Slower animation */
+  }
+  
+  @media (max-width: 480px) {
+    .tip-path-animated {
+      animation: none; /* Disable on very small screens */
+    }
+  }
 }
 
 /* Smooth path drawing effect */
@@ -1254,20 +1300,40 @@ body::before {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
-/* Enhanced pulse for tip highlighting */
-@keyframes enhanced-pulse {
-  0%, 100% { 
-    opacity: 0.8;
-    transform: scale(1);
-  }
-  50% { 
-    opacity: 0.4;
-    transform: scale(1.05);
-  }
+/* SVG Performance Optimizations */
+.game-svg {
+  will-change: transform;
+  shape-rendering: optimizeSpeed;
 }
 
-.animate-enhanced-pulse { 
-  animation: enhanced-pulse 1.5s ease-in-out infinite; 
+/* Path performance optimization */
+.path-segment {
+  transition: stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out;
+  will-change: stroke, stroke-width;
+}
+
+/* Mobile performance optimizations */
+@media (max-width: 768px) {
+  .game-svg {
+    shape-rendering: auto; /* Better quality on mobile */
+  }
+  
+  .smooth-path {
+    filter: none; /* Remove drop shadow on mobile for performance */
+  }
+}
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+  .animate-enhanced-pulse { 
+    animation: enhanced-pulse 2.5s ease-in-out infinite; /* Slower animation */
+  }
+  
+  @media (max-width: 480px) {
+    .animate-enhanced-pulse {
+      animation: none;
+      opacity: 0.6;
+      transform: scale(1);
+    }
+  }
 }
 
 /* Pen cursor effect */
