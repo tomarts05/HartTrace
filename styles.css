@@ -226,6 +226,23 @@ body::before {
   text-align: center;
   margin-bottom: 1.5rem;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.game-logo {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+  transition: all 0.3s ease;
+}
+
+.game-logo:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 25px rgba(255, 255, 255, 0.5));
 }
 
 .game-title h1 {
