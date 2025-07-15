@@ -1129,6 +1129,7 @@ export const PuzzleGame: React.FC = () => {
       <div className="game-container">
         {/* Game Title */}
         <div className="game-title">
+          <img src="/hart-logo-white.png" alt="HartTrace Logo" className="game-logo" />
           <h1>HartTrace</h1>
         </div>
         
