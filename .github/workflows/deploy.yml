@@ -1,4 +1,4 @@
-name: Deploy Game (Build & Upload Dist Only)
+name: Deploy Game (Build Dist Only)
 
 on:
   push:
@@ -34,20 +34,33 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-      - name: Start Tunnel and Rsync Build
+      - name: Start Tunnel, Clean Target, Rsync Build, Restart Services
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # Start tunnel to forward local port 2222 to homelab server
+          # Start Cloudflare Access TCP tunnel in background
           cloudflared access tcp \
             --hostname ssh.hartash.com \
             --url localhost:2222 &
 
-          # Wait for tunnel
+          # Wait a few seconds for tunnel to initialize
           sleep 5
 
-          # Sync only dist/ to the server
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no -p 2222" ./dist/ tomarts05@localhost:/var/www/hart.game/
+          echo "🔐 Connecting to homelab and clearing old files..."
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+            set -e
+            echo "🧹 Cleaning /var/www/hart.game"
+            rm -rf /var/www/hart.game/*
+          EOF
 
-          echo "✅ Deployed built dist/ to homelab!"
+          echo "📦 Uploading new dist files..."
+          rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
+
+          echo "🔁 Restarting services..."
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+            sudo systemctl restart nginx
+            sudo systemctl restart cloudflared
+          EOF
+
+          echo "✅ Deployment complete!"
