@@ -214,12 +214,40 @@ body::before {
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
+/* Stage Timer Section */
+.stage-timer-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
 .stage-info {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+/* Stage Title Compact for Mobile */
+.stage-title-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
+  border-radius: 1rem;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  font-size: 0.875rem;
+}
+
+.stage-description-inline {
+  color: #cbd5e1;
+  font-weight: 500;
+  margin-left: 0.25rem;
 }
 
 .stage-title {
@@ -272,6 +300,51 @@ body::before {
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
+/* Combined Timer Container for Mobile */
+.timer-container-combined {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.timer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.timer-item.global {
+  color: #60a5fa;
+}
+
+.timer-separator {
+  color: #64748b;
+  font-weight: bold;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* Responsive timer layout */
+@media (max-width: 480px) {
+  .timer-container-combined {
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  
+  .timer-item {
+    gap: 0.25rem;
+  }
+}
+
 .timer-time {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
   font-size: 1rem;
@@ -318,6 +391,63 @@ body::before {
   color: white;
   text-align: center;
   min-height: 44px; /* Better touch target */
+  position: relative;
+}
+
+/* Button text and icon styling */
+.btn-text {
+  display: inline-block !important;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 1 !important;
+  visibility: visible !important;
+  color: white !important;
+}
+
+.btn-icon {
+  display: inline-block;
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-right: 0.25rem;
+}
+
+/* Ensure button text is visible on mobile */
+@media (max-width: 640px) {
+  .control-button {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem !important;
+    gap: 0.375rem;
+    flex-direction: row !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+  
+  .btn-text {
+    display: inline-block !important; /* Force show text on mobile */
+    font-size: 0.875rem !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: white !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+  }
+  
+  .btn-icon {
+    font-size: 1rem;
+    margin-right: 0.375rem;
+  }
+}
+
+/* Desktop responsive adjustments */
+@media (min-width: 641px) {
+  .control-button {
+    font-size: 0.875rem;
+    gap: 0.5rem;
+  }
+  
+  .btn-text {
+    font-size: 0.875rem;
+  }
 }
 
 .control-button:hover:not(:disabled) {
@@ -380,17 +510,25 @@ body::before {
 }
 
 /* Responsive adjustments */
-@media (min-width: 640px) {
+@media (max-width: 640px) {
+  .controls-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  .control-button.reset-progress {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 641px) {
   .controls-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   
   .control-button.reset-progress {
     grid-column: span 1;
-  }
-  
-  .control-button {
-    font-size: 0.875rem;
   }
 }
 
