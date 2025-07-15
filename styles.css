@@ -311,7 +311,7 @@ body::before {
   border-radius: 0.75rem;
   border: 1px solid rgba(148, 163, 184, 0.2);
   width: 100%;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .timer-item {
@@ -326,10 +326,12 @@ body::before {
 }
 
 .timer-separator {
-  color: #64748b;
+  color: #e2e8f0;
   font-weight: bold;
-  font-size: 1rem;
+  font-size: 1.2rem;
   flex-shrink: 0;
+  margin: 0 0.25rem;
+  opacity: 1;
 }
 
 /* Responsive timer layout */
