@@ -331,10 +331,10 @@ body {
 }
 
 .inline-logo {
-  height: 1.2em; /* Match font size */
+  height: 1em; /* Match font size exactly */
   width: auto;
   display: inline-block;
-  vertical-align: baseline;
+  vertical-align: -0.1em; /* Fine-tune vertical position */
   margin: 0 0.02em; /* Small spacing */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
