@@ -39,28 +39,28 @@ jobs:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # Start Cloudflare Access TCP tunnel in background
+          echo "🚪 Starting Cloudflare TCP tunnel..."
           cloudflared access tcp \
             --hostname ssh.hartash.com \
             --url localhost:2222 &
 
-          # Wait a few seconds for tunnel to initialize
+          # Give tunnel time to establish
           sleep 5
 
-          echo "🔐 Connecting to homelab and clearing old files..."
+          echo "🧹 Cleaning /var/www/hart.game..."
           ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             set -e
-            echo "🧹 Cleaning /var/www/hart.game"
             rm -rf /var/www/hart.game/*
           EOF
 
-          echo "📦 Uploading new dist files..."
+          echo "📦 Deploying dist/ to /var/www/hart.game..."
           rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
-          echo "🔁 Restarting services..."
+          echo "🔁 Reloading systemd and restarting services..."
           ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
-            sudo systemctl restart nginx
-            sudo systemctl restart cloudflared
+            sudo /usr/bin/systemctl daemon-reload
+            sudo /usr/bin/systemctl restart nginx
+            sudo /usr/bin/systemctl restart cloudflared
           EOF
 
           echo "✅ Deployment complete!"
