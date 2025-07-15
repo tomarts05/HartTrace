@@ -1,4 +1,4 @@
-name: Deploy Game (Dist Only)
+name: Hart Deployment
 
 on:
   push:
@@ -53,9 +53,9 @@ jobs:
 
           echo "🔁 Restarting nginx and cloudflared..."
           ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost <<'EOF'
-            sudo /usr/bin/systemctl daemon-reload
-            sudo /usr/bin/systemctl restart nginx
-            sudo /usr/bin/systemctl restart cloudflared
+            sudo -n /usr/bin/systemctl daemon-reload
+            sudo -n /usr/bin/systemctl restart nginx
+            sudo -n /usr/bin/systemctl restart cloudflared
           EOF
 
           echo "✅ Deployment complete!"
