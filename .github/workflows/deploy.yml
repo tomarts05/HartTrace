@@ -53,22 +53,25 @@ jobs:
 
       - name: 🔁 Restart nginx and cloudflared
         run: |
+          echo "📄 Writing remote restart script..."
           cat << 'EOSCRIPT' > restart.sh
           #!/bin/bash
+          echo "🔄 Running remote restart commands..."
           set -e
           sudo -n /usr/bin/systemctl daemon-reload
           sudo -n /usr/bin/systemctl restart nginx
           sudo -n /usr/bin/systemctl restart cloudflared
+          echo "✅ Remote services restarted."
           EOSCRIPT
       
           chmod +x restart.sh
       
-          echo "🚀 Uploading restart script..."
+          echo "🚀 Uploading script to remote server..."
           scp -P 2222 -o StrictHostKeyChecking=no restart.sh tomarts05@localhost:/tmp/restart.sh
       
-          echo "▶️ Running restart script remotely..."
-          ssh -tt -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost "bash /tmp/restart.sh && rm /tmp/restart.sh"
+          echo "▶️ Executing script on remote server..."
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost 'bash /tmp/restart.sh && rm /tmp/restart.sh'
       
-          echo "✅ Restart complete."
+          echo "✅ Remote restart completed successfully."
 
           echo "✅ Deployment complete!"
