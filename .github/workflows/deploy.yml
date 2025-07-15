@@ -51,17 +51,14 @@ jobs:
           echo "📦 Deploying dist/ to /var/www/hart.game via rsync (with delete)..."
           rsync -avz --delete -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
-      - name: 🔁 Restart nginx and cloudflared
+      - name: 🔁 Upload restart script
         run: |
           echo "📄 Writing remote restart script..."
           cat << 'EOSCRIPT' > restart.sh
           #!/bin/bash
-          echo "🔄 Running remote restart commands..."
-          set -e
-          sudo -n /usr/bin/systemctl daemon-reload
-          sudo -n /usr/bin/systemctl restart nginx
-          sudo -n /usr/bin/systemctl restart cloudflared
-          echo "✅ Remote services restarted."
+          echo "🔄 Scheduling nginx and cloudflared restart..."
+          nohup bash -c 'sleep 10 && sudo -n systemctl restart nginx && sudo -n systemctl restart cloudflared' >/dev/null 2>&1 &
+          echo "✅ Restart scheduled in background."
           EOSCRIPT
       
           chmod +x restart.sh
@@ -69,9 +66,9 @@ jobs:
           echo "🚀 Uploading script to remote server..."
           scp -P 2222 -o StrictHostKeyChecking=no restart.sh tomarts05@localhost:/tmp/restart.sh
       
-          echo "▶️ Executing script on remote server..."
+      - name: ▶️ Execute restart script remotely
+        run: |
+          echo "▶️ Executing restart script..."
           ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost 'bash /tmp/restart.sh && rm /tmp/restart.sh'
-      
-          echo "✅ Remote restart completed successfully."
-
+          echo "✅ Remote restart script executed."
           echo "✅ Deployment complete!"
