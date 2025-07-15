@@ -19,20 +19,22 @@ jobs:
           chmod +x cloudflared
           sudo mv cloudflared /usr/local/bin/cloudflared
 
-      - name: Start SSH Tunnel to Homelab via Cloudflare Access
+      - name: Start SSH Agent and Add Private Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
+
+      - name: Start Tunnel and Deploy
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
-          # Start the tunnel in the background to forward local port 2222 to ssh.hartash.com:22
           cloudflared access tcp \
             --hostname ssh.hartash.com \
             --url localhost:2222 &
           
-          # Wait a bit to ensure the tunnel is up
           sleep 5
 
-          # Use OpenSSH to connect through the tunnel and run deployment commands
           ssh -o StrictHostKeyChecking=no -p 2222 tomarts05@localhost << 'EOF'
             set -e
 
@@ -49,12 +51,6 @@ jobs:
               cd "$TARGET_DIR"
               git pull origin main
             fi
-
-            # Optional: Restart or build
-            # cd $TARGET_DIR
-            # npm install
-            # npm run build
-            # pm2 restart hart-game
 
             echo "✅ Deployment complete"
           EOF
