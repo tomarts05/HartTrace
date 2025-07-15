@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Dependencies & Build
+      - name: Install & Build
         run: |
           npm install
           npm run build
@@ -34,7 +34,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-      - name: Deploy to Homelab via Tunnel
+      - name: Deploy via Cloudflare Tunnel
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
@@ -43,8 +43,7 @@ jobs:
           cloudflared access tcp \
             --hostname ssh.hartash.com \
             --url localhost:2222 &
-          
-          # Wait for the tunnel to initialize
+
           sleep 5
 
           echo "🧹 Cleaning /var/www/hart.game..."
@@ -52,17 +51,18 @@ jobs:
             set -e
             sudo mkdir -p /var/www/hart.game
             sudo rm -rf /var/www/hart.game/*
+            echo "✅ Folder cleaned"
           EOF
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
           rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
-          echo "🔁 Reloading systemd and restarting services..."
+          echo "🔁 Restarting services..."
           ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
-            sudo systemctl daemon-reexec || true
-            sudo systemctl daemon-reload || true
-            sudo systemctl restart nginx || true
-            sudo systemctl restart cloudflared || true
+            set -e
+            sudo systemctl daemon-reexec
+            sudo systemctl daemon-reload
+            sudo systemctl restart nginx
+            sudo systemctl restart cloudflared
+            echo "✅ All services restarted"
           EOF
-
-          echo "✅ Deployment complete!"
