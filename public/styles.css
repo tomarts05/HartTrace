@@ -1429,10 +1429,18 @@ body {
   .control-button {
     padding: 0.75rem 0.5rem;
     font-size: 0.75rem;
+    flex-direction: column;
+    gap: 0.25rem;
   }
   
   .control-button .btn-text {
-    display: none;
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  
+  .control-button .btn-icon {
+    font-size: 1rem;
   }
   
   .victory-content {
