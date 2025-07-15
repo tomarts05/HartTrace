@@ -1,6 +1,6 @@
 
 import React from 'react';
-import PuzzleGame from './components/PuzzleGame';
+import { PuzzleGame } from './components/PuzzleGame';
 
 const App: React.FC = () => {
   return <PuzzleGame />;
