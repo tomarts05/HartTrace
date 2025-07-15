@@ -31,4 +31,38 @@ jobs:
 
       - name: 🔐 Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
-        with
+        with:
+          ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
+
+      - name: 🚀 Start Tunnel, Clean, Deploy, and Restart
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
+        run: |
+          echo "🚪 Starting Cloudflare TCP tunnel..."
+          cloudflared access tcp \
+            --hostname ssh.hartash.com \
+            --url localhost:2222 &
+
+          sleep 5
+
+          echo "🧹 Cleaning /var/www/hart.game..."
+          ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+            set -e
+            rm -rf /var/www/hart.game/*
+            exit 0
+          EOF
+
+          echo "📦 Deploying dist/ to /var/www/hart.game..."
+          rsync -avz -e "ssh -T -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
+
+          echo "🔁 Reloading systemd and restarting services..."
+          ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+            set -e
+            sudo /usr/bin/systemctl daemon-reload
+            sudo /usr/bin/systemctl restart nginx
+            sudo /usr/bin/systemctl restart cloudflared
+            exit 0
+          EOF
+
+          echo "✅ Deployment complete!"
