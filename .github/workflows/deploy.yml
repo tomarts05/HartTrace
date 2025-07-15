@@ -34,7 +34,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-      - name: 🚀 Start Tunnel, Clean, Deploy, and Restart
+      - name: 🚀 Start Tunnel, Deploy, and Restart
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
@@ -50,7 +50,9 @@ jobs:
           ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             set -e
             mkdir -p /var/www/hart.game
+            shopt -s dotglob
             rm -rf /var/www/hart.game/*
+            echo "✅ Folder cleaned"
             exit 0
           EOF
 
@@ -63,6 +65,7 @@ jobs:
             sudo /usr/bin/systemctl daemon-reload || true
             sudo /usr/bin/systemctl restart nginx || true
             sudo /usr/bin/systemctl restart cloudflared || true
+            echo "✅ Services restarted"
             exit 0
           EOF
 
