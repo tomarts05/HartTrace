@@ -14,16 +14,39 @@ export default defineConfig({
         // Inline assets for FB Instant Games
         inlineDynamicImports: true,
         manualChunks: undefined,
-        // Clean asset naming
-        assetFileNames: 'assets/[name].[hash].[ext]',
-        chunkFileNames: 'assets/[name].[hash].js',
-        entryFileNames: 'assets/[name].[hash].js'
-      }
+        // Clean asset naming with longer cache headers
+        assetFileNames: (assetInfo) => {
+          // Use different naming for images vs other assets
+          const extType = assetInfo.name?.split('.').at(1);
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico|webp/i.test(extType || '')) {
+            return 'assets/img/[name].[hash][extname]';
+          }
+          return 'assets/[name].[hash][extname]';
+        },
+        chunkFileNames: 'assets/js/[name].[hash].js',
+        entryFileNames: 'assets/js/[name].[hash].js'
+      },
+      // Tree shake unused imports
+      treeshake: true
     },
     // Target modern browsers for better performance
-    target: 'es2015',
-    // Optimize for size
-    minify: 'terser'
+    target: 'es2020',
+    // Optimize for size and performance
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs in production
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug']
+      },
+      format: {
+        comments: false
+      }
+    },
+    // Optimize chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Enable source maps for debugging (but exclude from bundle)
+    sourcemap: false
   },
   // Facebook Instant Games CSP requirements
   server: {
@@ -32,5 +55,9 @@ export default defineConfig({
     }
   },
   // Ensure assets are properly handled
-  assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif']
+  assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.webp'],
+  // Performance optimizations
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'framer-motion', 'lodash']
+  }
 });

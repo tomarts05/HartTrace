@@ -1131,11 +1131,14 @@ export const PuzzleGame: React.FC = () => {
         <div className="game-title">
           <h1>
             H
-            <img 
-              src="/hart-logo.png" 
-              alt="a" 
-              className="inline-logo"
-            />
+            <picture>
+              <source srcSet="/hart-logo.webp" type="image/webp" />
+              <img 
+                src="/hart-logo-optimized.png" 
+                alt="a" 
+                className="inline-logo"
+              />
+            </picture>
             rtTrace
           </h1>
         </div>
