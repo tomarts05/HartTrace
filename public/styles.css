@@ -325,6 +325,18 @@ body {
   letter-spacing: -0.03em;
   position: relative;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inline-logo {
+  height: 1.2em; /* Match font size */
+  width: auto;
+  display: inline-block;
+  vertical-align: baseline;
+  margin: 0 0.02em; /* Small spacing */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .game-title h1::after {
