@@ -1091,7 +1091,7 @@ export const PuzzleGame: React.FC = () => {
             initial={reducedAnimations ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.9 }}
             animate={reducedAnimations ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
             exit={reducedAnimations ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.9 }}
-            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
+            transition={reducedAnimations ? { duration: 0.15 } : { duration: 0.2 }}
             className={`notification ${notification.type}`}
           >
             {notification.message}
@@ -1331,7 +1331,7 @@ export const PuzzleGame: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
+            transition={reducedAnimations ? { duration: 0.1 } : { duration: 0.2 }}
             className="victory-overlay"
             onClick={() => setShowProgressSummary(false)}
           >
@@ -1339,7 +1339,7 @@ export const PuzzleGame: React.FC = () => {
               initial={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
               animate={reducedAnimations ? { opacity: 1 } : { scale: 1, y: 0 }}
               exit={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
-              transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
+              transition={reducedAnimations ? { duration: 0.15 } : { duration: 0.25 }}
               className="victory-content"
               onClick={(e) => e.stopPropagation()}
             >
@@ -1452,19 +1452,19 @@ export const PuzzleGame: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
+            transition={reducedAnimations ? { duration: 0.1 } : { duration: 0.2 }}
             className="victory-overlay"
           >
             <motion.div
               initial={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
               animate={reducedAnimations ? { opacity: 1 } : { scale: 1, y: 0 }}
               exit={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
-              transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
+              transition={reducedAnimations ? { duration: 0.15 } : { duration: 0.25 }}
               className="victory-content"
             >
               {/* Dynamic victory celebration based on completion level */}
               {complexityLevel === COMPLEXITY_LEVELS.length - 1 ? (
-                <div className="victory-emoji animate-bounce">🏆</div>
+                <div className="victory-emoji">🏆</div>
               ) : (
                 <div className="victory-emoji">🎉</div>
               )}
