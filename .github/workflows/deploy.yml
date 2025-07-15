@@ -53,9 +53,11 @@ jobs:
 
           echo "🔁 Restarting nginx and cloudflared..."
           ssh -p 2222 -tt -o StrictHostKeyChecking=no tomarts05@localhost <<'EOF'
+            set -e
             sudo -n /usr/bin/systemctl daemon-reload
             sudo -n /usr/bin/systemctl restart nginx
             sudo -n /usr/bin/systemctl restart cloudflared
+            exit
           EOF
 
           echo "✅ Deployment complete!"
