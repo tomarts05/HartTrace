@@ -52,7 +52,7 @@ jobs:
             mkdir -p /var/www/hart.game
             rm -rf /var/www/hart.game/*
             exit 0
-EOF
+          EOF
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
           rsync -avz -e "ssh -T -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
@@ -64,6 +64,6 @@ EOF
             sudo /usr/bin/systemctl restart nginx || true
             sudo /usr/bin/systemctl restart cloudflared || true
             exit 0
-EOF
+          EOF
 
           echo "✅ Deployment complete!"
