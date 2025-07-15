@@ -38,6 +38,7 @@ jobs:
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
+          HOMELAB_PASSWORD: ${{ secrets.HOMELAB_PASSWORD }}
         run: |
           echo "🚪 Starting Cloudflare TCP tunnel..."
           cloudflared access tcp \
@@ -47,22 +48,22 @@ jobs:
           sleep 5
 
           echo "🧹 Cleaning /var/www/hart.game..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost <<EOF
             set -e
-            sudo mkdir -p /var/www/hart.game
-            sudo rm -rf /var/www/hart.game/*
+            echo "\$HOMELAB_PASSWORD" | sudo -S mkdir -p /var/www/hart.game
+            echo "\$HOMELAB_PASSWORD" | sudo -S rm -rf /var/www/hart.game/*
             echo "✅ Folder cleaned"
-          EOF
+EOF
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
           rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
           echo "🔁 Restarting services..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost <<EOF
             set -e
-            sudo systemctl daemon-reexec
-            sudo systemctl daemon-reload
-            sudo systemctl restart nginx
-            sudo systemctl restart cloudflared
+            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl daemon-reexec
+            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl daemon-reload
+            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl restart nginx
+            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl restart cloudflared
             echo "✅ All services restarted"
-          EOF
+EOF
