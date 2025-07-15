@@ -1176,9 +1176,8 @@ export const PuzzleGame: React.FC = () => {
           {/* Controls - Mobile Optimized Grid */}
           <div className="controls-grid">
             <button onClick={resetGame} className="control-button reset">
-                <ReplayIcon className="icon-sm" />
-                <span className="btn-text">Reset</span>
                 <span className="btn-icon">↻</span>
+                <span className="btn-text">Reset</span>
             </button>
             <button 
               onClick={resetAllProgress}
@@ -1186,32 +1185,23 @@ export const PuzzleGame: React.FC = () => {
               style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
               title="Reset to Stage 1 and clear ALL progress records"
             >
-                <span>🔄</span>
+                <span className="btn-icon">🔄</span>
                 <span className="btn-text">Reset All</span>
-                <span className="btn-icon">⏮</span>
             </button>
             <button 
               onClick={undoLastPath}
               disabled={paths.length === 0 && currentPath.length === 0}
               className={`control-button ${paths.length === 0 && currentPath.length === 0 ? 'undo disabled' : 'undo'}`}
             >
-                <span>🔙</span>
+                <span className="btn-icon">🔙</span>
                 <span className="btn-text">Undo</span>
             </button>
-            {/* <button 
-              onClick={showTipHandler}
-              disabled={gameState === GAME_STATE.WON}
-              className={`control-button ${gameState === GAME_STATE.WON ? 'tip disabled' : 'tip'}`}
-            >
-                <span className="text-xs">💡</span>
-                <span className="hidden-sm">Tip</span>
-            </button> */}
             <button 
               onClick={() => setShowProgressSummary(true)}
               className="control-button progress"
               title="View Progress Summary"
             >
-                <span>📈</span>
+                <span className="btn-icon">📈</span>
                 <span className="btn-text">Progress</span>
             </button>
           </div>
