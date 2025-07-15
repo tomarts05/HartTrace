@@ -233,8 +233,8 @@ body::before {
 }
 
 .game-logo {
-  width: 2rem;
-  height: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
   object-fit: contain;
   filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
   transition: all 0.3s ease;
@@ -253,8 +253,8 @@ body::before {
   }
   
   .game-logo {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.25rem;
+    height: 1.25rem;
   }
   
   .game-title h1 {
@@ -269,8 +269,8 @@ body::before {
   }
   
   .game-logo {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1rem;
+    height: 1rem;
   }
   
   .game-title h1 {
@@ -280,8 +280,8 @@ body::before {
 
 @media (min-width: 1024px) {
   .game-logo {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 1.75rem;
+    height: 1.75rem;
   }
   
   .game-title h1 {
