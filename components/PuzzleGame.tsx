@@ -1127,9 +1127,17 @@ export const PuzzleGame: React.FC = () => {
       
       {/* Game Container - Mobile First Design */}
       <div className="game-container">
-        {/* Game Title */}
+        {/* Game Title with Inline Logo */}
         <div className="game-title">
-          <h1>HartTrace</h1>
+          <h1>
+            H
+            <img 
+              src="/hart-logo.png" 
+              alt="a" 
+              className="inline-logo"
+            />
+            rtTrace
+          </h1>
         </div>
         
         {/* Header Section - Mobile Optimized */}
