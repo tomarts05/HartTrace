@@ -13,28 +13,43 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
-
-      - name: Deploy to Homelab Server
+      - name: Install cloudflared
         run: |
-          ssh -o StrictHostKeyChecking=no tomarts05@ssh.hartash.com << 'EOF'
-            set -e
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+          sudo mv cloudflared /usr/local/bin/cloudflared
 
-            TARGET_DIR="/var/www/hart.game"
-            GIT_REPO="https://github.com/tomarts05/HartTrace"
+      - name: Deploy to Homelab Server via Cloudflare Access SSH
+        env:
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
+        run: |
+          cloudflared access ssh \
+            --hostname ssh.hartash.com \
+            --client-id $CLOUDFLARE_ACCESS_CLIENT_ID \
+            --client-secret $CLOUDFLARE_ACCESS_CLIENT_SECRET \
+            --command '
+              set -e
 
-            # If not a git repo yet, initialize
-            if [ ! -d "$TARGET_DIR/.git" ]; then
-              rm -rf "$TARGET_DIR"
-              git clone "$GIT_REPO" "$TARGET_DIR"
-            else
-              cd "$TARGET_DIR"
-              git pull origin main
-            fi
+              TARGET_DIR="/var/www/hart.game"
+              GIT_REPO="https://github.com/tomarts05/HartTrace"
 
-            # Optional: Restart server, pm2, or reload nginx if needed
-            # sudo systemctl reload nginx
-          EOF
+              echo "🔍 Checking if directory exists..."
+              if [ ! -d "$TARGET_DIR/.git" ]; then
+                echo "📁 Fresh clone to $TARGET_DIR"
+                rm -rf "$TARGET_DIR"
+                git clone "$GIT_REPO" "$TARGET_DIR"
+              else
+                echo "🔄 Pulling latest code in $TARGET_DIR"
+                cd "$TARGET_DIR"
+                git pull origin main
+              fi
+
+              # Optional: build or restart commands
+              # cd $TARGET_DIR
+              # npm install
+              # npm run build
+              # pm2 restart hart-game
+
+              echo "✅ Deployment complete"
+            '
