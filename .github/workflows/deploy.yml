@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -22,13 +22,6 @@ jobs:
         run: |
           npm install
           npm run build
-
-      - name: Check if dist exists
-        run: |
-          if [ ! -d "dist" ]; then
-            echo "❌ dist/ folder missing!"
-            exit 1
-          fi
 
       - name: Install cloudflared
         run: |
@@ -41,7 +34,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-      - name: Deploy via Cloudflare Tunnel
+      - name: Deploy to Homelab via Tunnel
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
@@ -50,28 +43,26 @@ jobs:
           cloudflared access tcp \
             --hostname ssh.hartash.com \
             --url localhost:2222 &
-
-          # Wait for tunnel to initialize
+          
+          # Wait for the tunnel to initialize
           sleep 5
 
           echo "🧹 Cleaning /var/www/hart.game..."
-          ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             set -e
             sudo mkdir -p /var/www/hart.game
             sudo rm -rf /var/www/hart.game/*
-            echo "✅ Folder cleaned"
           EOF
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
-          rsync -avz --delete -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
+          rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
           echo "🔁 Reloading systemd and restarting services..."
-          ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
+          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             sudo systemctl daemon-reexec || true
             sudo systemctl daemon-reload || true
             sudo systemctl restart nginx || true
             sudo systemctl restart cloudflared || true
-            echo "✅ Services restarted"
           EOF
 
           echo "✅ Deployment complete!"
