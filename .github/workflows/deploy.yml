@@ -10,57 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: 🧰 Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install & Build
+      - name: 🏗️ Install & Build
         run: |
           npm install
           npm run build
 
-      - name: Install cloudflared
+      - name: ☁️ Install cloudflared
         run: |
           curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
           chmod +x cloudflared
           sudo mv cloudflared /usr/local/bin/cloudflared
 
-      - name: Start SSH Agent
+      - name: 🔐 Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
-
-      - name: Start Tunnel, Clean Target, Rsync Build, Restart Services
-        env:
-          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
-          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
-        run: |
-          echo "🚪 Starting Cloudflare TCP tunnel..."
-          cloudflared access tcp \
-            --hostname ssh.hartash.com \
-            --url localhost:2222 &
-
-          # Give tunnel time to establish
-          sleep 5
-
-          echo "🧹 Cleaning /var/www/hart.game..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
-            set -e
-            rm -rf /var/www/hart.game/*
-          EOF
-
-          echo "📦 Deploying dist/ to /var/www/hart.game..."
-          rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
-
-          echo "🔁 Reloading systemd and restarting services..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
-            sudo /usr/bin/systemctl daemon-reload
-            sudo /usr/bin/systemctl restart nginx
-            sudo /usr/bin/systemctl restart cloudflared
-          EOF
-
-          echo "✅ Deployment complete!"
+        with
