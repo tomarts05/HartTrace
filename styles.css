@@ -703,7 +703,7 @@ body::before {
   font-size: 0.875rem;
 }
 
-/* Victory Screen */
+/* Victory Screen - Optimized for mobile centering */
 .victory-overlay {
   position: fixed;
   top: 0;
@@ -713,20 +713,35 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(15, 23, 42, 0.9);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
   z-index: 50;
   padding: 1rem;
+  /* Ensure proper centering on all devices */
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile */
 }
 
 .victory-content {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  padding: 1rem 1.5rem 2rem;
-  border-radius: 0.75rem;
-  border: 1px solid #334155;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+  padding: 1.5rem 1.5rem 2rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   text-align: center;
   width: 100%;
-  max-width: 20rem;
+  max-width: min(90vw, 20rem);
+  max-height: min(90vh, 90dvh);
+  overflow-y: auto;
+  /* Ensure content is centered within modal */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(20px);
 }
 
 .victory-emoji {
@@ -757,26 +772,43 @@ body::before {
 .victory-buttons {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  align-items: center; /* Center buttons horizontally */
-  justify-content: center; /* Center buttons vertically */
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   max-width: 300px;
   margin: 0 auto;
+  padding-top: 0.5rem;
 }
 
 .victory-button {
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1.25rem;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  width: auto; /* Let button size to content */
-  min-width: 160px; /* Minimum width for consistency */
-  text-align: center; /* Center text within button */
+  width: 100%;
+  max-width: 250px;
+  text-align: center;
   transition: all 0.15s ease-in-out;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.3);
+  /* Performance optimization: Use transform for hover states */
+  will-change: transform;
+  /* Better touch target for mobile */
+  min-height: 44px;
+}
+
+/* Hover and touch states optimized for performance */
+.victory-button:hover,
+.victory-button:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.4);
+}
+
+.victory-button:active {
+  transform: translateY(0);
+  transition: transform 0.05s ease-in-out;
 }
 
 .victory-button.next {
@@ -1304,6 +1336,10 @@ body::before {
 .game-svg {
   will-change: transform;
   shape-rendering: optimizeSpeed;
+  /* Additional performance optimizations */
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform-style: preserve-3d;
 }
 
 /* Path performance optimization */
@@ -1316,10 +1352,23 @@ body::before {
 @media (max-width: 768px) {
   .game-svg {
     shape-rendering: auto; /* Better quality on mobile */
+    /* Force hardware acceleration on mobile */
+    transform: translate3d(0, 0, 0);
   }
   
   .smooth-path {
     filter: none; /* Remove drop shadow on mobile for performance */
+  }
+  
+  /* Reduce animation complexity on mobile */
+  .path-segment {
+    transition: none; /* Remove transitions on mobile for better performance */
+  }
+  
+  /* Optimize cursor positioning */
+  .victory-overlay {
+    /* Reduce backdrop-filter blur on mobile for performance */
+    backdrop-filter: blur(4px);
   }
 }
 @media (max-width: 768px), (prefers-reduced-motion: reduce) {
@@ -1424,22 +1473,7 @@ body::before {
   }
 }
 
-/* Victory Modal Enhancement */
-.victory-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  animation: fadeIn 0.3s ease-out;
-}
-
+/* Animation keyframes for victory modal */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

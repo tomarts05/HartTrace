@@ -24,8 +24,12 @@ export const PuzzleGame: React.FC = () => {
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
-  const maxPenPoints = performanceMode === 'low' ? 20 : performanceMode === 'medium' ? 35 : 50;
-  const penUpdateFrequency = performanceMode === 'low' ? 5 : performanceMode === 'medium' ? 4 : 3;
+  const maxPenPoints = performanceMode === 'low' ? 15 : performanceMode === 'medium' ? 25 : 40;
+  const penUpdateFrequency = performanceMode === 'low' ? 8 : performanceMode === 'medium' ? 6 : 4;
+  
+  // Performance refs for throttling updates
+  const penUpdateCounterRef = useRef(0);
+  const lastPenUpdateRef = useRef(0);
   
   // Facebook Instant Games integration
   const [fbState, fbActions] = useFBInstant();
@@ -82,12 +86,23 @@ export const PuzzleGame: React.FC = () => {
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
   const occupiedCells = useMemo(() => new Set(paths.flatMap(p => p.cells)), [paths]);
 
+  // Memoize grid lines for better performance
+  const gridLines = useMemo(() => {
+    return Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
+      <g key={i} className="grid-lines">
+        <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
+        <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
+      </g>
+    ));
+  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
   useEffect(() => {
     let interval: number;
     if (gameState === GAME_STATE.PLAYING) {
       interval = window.setInterval(() => {
+        // Batch timer updates to reduce re-renders
         setTimer(prev => prev + 1);
-        setGlobalTimer(prev => prev + 1); // Also increment global timer
+        setGlobalTimer(prev => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -630,17 +645,28 @@ export const PuzzleGame: React.FC = () => {
           return;
         }
         
-        // IMMEDIATELY update cursor position for smooth pen-like drawing
-        setCursorPos({ x: svgX, y: svgY });
+        // Update cursor position with throttling for mobile performance
+        const now = performance.now();
+        const shouldUpdateCursor = performanceMode === 'low' ? (now - lastPenUpdateRef.current >= 33) : true;
+        
+        if (shouldUpdateCursor) {
+          setCursorPos({ x: svgX, y: svgY });
+        }
         
         // Add point to pen path for smooth curve drawing (use ref for performance)
         penPathRef.current.push({ x: svgX, y: svgY });
+        
         // Keep only last N points for performance (optimized based on device capability)
         if (penPathRef.current.length > maxPenPoints) {
           penPathRef.current = penPathRef.current.slice(-maxPenPoints);
         }
-        // Trigger re-render less frequently for better performance (optimized based on device)
-        if (penPathRef.current.length % penUpdateFrequency === 0) {
+        
+        // Throttle pen path updates for better performance
+        penUpdateCounterRef.current++;
+        
+        // Update pen path visualization based on time-based throttling for smoother performance
+        if (now - lastPenUpdateRef.current >= (performanceMode === 'low' ? 50 : performanceMode === 'medium' ? 33 : 16)) {
+          lastPenUpdateRef.current = now;
           setPenPathUpdate(prev => prev + 1);
         }
       } catch (error) {
@@ -1190,13 +1216,8 @@ export const PuzzleGame: React.FC = () => {
             style={{ touchAction: 'none', aspectRatio: '1/1' }}
             viewBox={`0 0 ${currentComplexity.gridSize * currentComplexity.cellSize} ${currentComplexity.gridSize * currentComplexity.cellSize}`}
           >
-            {/* Grid Lines */}
-            {Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
-              <g key={i} className="grid-lines">
-                <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-                <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-              </g>
-            ))}
+            {/* Grid Lines - Memoized for performance */}
+            {gridLines}
 
             {/* Drawn Paths */}
             <g className="pointer-events-none">
