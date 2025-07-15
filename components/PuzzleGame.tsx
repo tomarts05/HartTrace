@@ -611,8 +611,9 @@ export const PuzzleGame: React.FC = () => {
   const handleInteractionMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDrawing) return;
     
-    // Prevent default behavior
-    if (e.cancelable) {
+    // Prevent default behavior only for non-passive events (mouse events)
+    // Touch events are registered as passive for performance, so they can't preventDefault
+    if (e.cancelable && e.type === 'mousemove') {
       e.preventDefault();
     }
 
