@@ -51,11 +51,15 @@ jobs:
           echo "📦 Deploying dist/ to /var/www/hart.game via rsync (with delete)..."
           rsync -avz --delete -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
-          echo "🔁 Restarting nginx and cloudflared..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost <<'EOF'
-            sudo -n /usr/bin/systemctl daemon-reload
-            sudo -n /usr/bin/systemctl restart nginx
-            sudo -n /usr/bin/systemctl restart cloudflared
-          EOF
+          - name: Restart services safely
+          run: |
+            echo "🔁 Restarting nginx and cloudflared..."
+            ssh -tt -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost "
+              sudo -n /usr/bin/systemctl daemon-reexec &&
+              sudo -n /usr/bin/systemctl daemon-reload &&
+              sudo -n /usr/bin/systemctl restart nginx &&
+              sudo -n /usr/bin/systemctl restart cloudflared
+            "
+          continue-on-error: true
 
           echo "✅ Deployment complete!"
