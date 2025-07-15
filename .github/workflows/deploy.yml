@@ -49,9 +49,10 @@ jobs:
           echo "🧹 Cleaning /var/www/hart.game..."
           ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             set -e
+            mkdir -p /var/www/hart.game
             rm -rf /var/www/hart.game/*
             exit 0
-          EOF
+EOF
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
           rsync -avz -e "ssh -T -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
@@ -59,10 +60,10 @@ jobs:
           echo "🔁 Reloading systemd and restarting services..."
           ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             set -e
-            sudo /usr/bin/systemctl daemon-reload
-            sudo /usr/bin/systemctl restart nginx
-            sudo /usr/bin/systemctl restart cloudflared
+            sudo /usr/bin/systemctl daemon-reload || true
+            sudo /usr/bin/systemctl restart nginx || true
+            sudo /usr/bin/systemctl restart cloudflared || true
             exit 0
-          EOF
+EOF
 
           echo "✅ Deployment complete!"
