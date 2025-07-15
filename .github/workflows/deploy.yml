@@ -48,22 +48,19 @@ jobs:
           sleep 5
 
           echo "🧹 Cleaning /var/www/hart.game..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost <<EOF
-            set -e
-            echo "\$HOMELAB_PASSWORD" | sudo -S mkdir -p /var/www/hart.game
-            echo "\$HOMELAB_PASSWORD" | sudo -S rm -rf /var/www/hart.game/*
-            echo "✅ Folder cleaned"
-          EOF
+          echo "$HOMELAB_PASSWORD" | ssh -tt -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost "
+            echo '$HOMELAB_PASSWORD' | sudo -S rm -rf /var/www/hart.game/*
+            echo '✅ Folder cleaned'
+          "
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
           rsync -avz -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
           echo "🔁 Restarting services..."
-          ssh -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost <<EOF
-            set -e
-            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl daemon-reexec
-            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl daemon-reload
-            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl restart nginx
-            echo "\$HOMELAB_PASSWORD" | sudo -S systemctl restart cloudflared
-            echo "✅ All services restarted"
-          EOF
+          echo "$HOMELAB_PASSWORD" | ssh -tt -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost "
+            echo '$HOMELAB_PASSWORD' | sudo -S systemctl daemon-reexec
+            echo '$HOMELAB_PASSWORD' | sudo -S systemctl daemon-reload
+            echo '$HOMELAB_PASSWORD' | sudo -S systemctl restart nginx
+            echo '$HOMELAB_PASSWORD' | sudo -S systemctl restart cloudflared
+            echo '✅ All services restarted'
+          "
