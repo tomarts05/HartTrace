@@ -661,8 +661,13 @@ body::before {
   backdrop-filter: blur(4px);
   z-index: 50;
   padding: 1rem;
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* Use viewport dimensions for proper centering */
+  width: 100vw;
+  height: 100vh;
+  /* Fallback for older browsers */
+  height: 100dvh;
+  /* Ensure modal is always centered in current viewport */
+  inset: 0;
 }
 
 .victory-content {
@@ -683,6 +688,10 @@ body::before {
   justify-content: center;
   /* Simple animation */
   animation: slideIn 0.3s ease-out;
+  /* Ensure content is centered within its container */
+  margin: auto;
+  /* Prevent any positioning issues */
+  position: relative;
 }
 
 @keyframes slideIn {
