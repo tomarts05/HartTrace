@@ -10,31 +10,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Setup SSH Agent
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-    - name: Deploy to Homelab Server
-      run: |
-        ssh -o StrictHostKeyChecking=no tomarts05@192.168.100.149 << 'EOF'
-          set -e
+      - name: Deploy to Homelab Server
+        run: |
+          ssh -o StrictHostKeyChecking=no tomarts05@ssh.hartash.com << 'EOF'
+            set -e
 
-          TARGET_DIR="/var/www/hart.game"
-          GIT_REPO="https://github.com/tomarts05/HartTrace"
+            TARGET_DIR="/var/www/hart.game"
+            GIT_REPO="https://github.com/tomarts05/HartTrace"
 
-          # If not a git repo yet, initialize
-          if [ ! -d "$TARGET_DIR/.git" ]; then
-            rm -rf "$TARGET_DIR"
-            git clone "$GIT_REPO" "$TARGET_DIR"
-          else
-            cd "$TARGET_DIR"
-            git pull origin main
-          fi
+            # If not a git repo yet, initialize
+            if [ ! -d "$TARGET_DIR/.git" ]; then
+              rm -rf "$TARGET_DIR"
+              git clone "$GIT_REPO" "$TARGET_DIR"
+            else
+              cd "$TARGET_DIR"
+              git pull origin main
+            fi
 
-          # Optional: Restart server, pm2, or reload nginx if needed
-          # sudo systemctl reload nginx
-        EOF
+            # Optional: Restart server, pm2, or reload nginx if needed
+            # sudo systemctl reload nginx
+          EOF
