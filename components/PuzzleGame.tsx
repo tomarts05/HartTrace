@@ -43,34 +43,25 @@ export const PuzzleGame: React.FC = () => {
   const [penPathUpdate, setPenPathUpdate] = useState(0); // Trigger for pen path updates
   const [timer, setTimer] = useState(0);
   const [globalTimer, setGlobalTimer] = useState(0); // Track total progress time across all stages
-  const [complexityLevel, setComplexityLevel] = useState(1); // Start with Medium complexity (index 1) - can reset to Easy (index 0) with Reset All
+  const [complexityLevel, setComplexityLevel] = useState(0); // Always start with Stage 1 (index 0) on initial load
   const [puzzleId, setPuzzleId] = useState(0); // Add unique puzzle ID to force re-renders
   
-  // Stage completion tracking for detailed progress and sharing
-  const [stageCompletionTimes, setStageCompletionTimes] = useState<number[]>(() => {
-    const saved = localStorage.getItem('hartai-stage-times');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [totalGameCompletions, setTotalGameCompletions] = useState<number>(() => {
-    const saved = localStorage.getItem('hartai-completions');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [bestTotalTime, setBestTotalTime] = useState<number>(() => {
-    const saved = localStorage.getItem('hartai-best-time');
-    return saved ? parseInt(saved, 10) : Infinity;
-  });
+  // Stage completion tracking for detailed progress and sharing - always start fresh
+  const [stageCompletionTimes, setStageCompletionTimes] = useState<number[]>([]);
+  const [totalGameCompletions, setTotalGameCompletions] = useState<number>(0);
+  const [bestTotalTime, setBestTotalTime] = useState<number>(Infinity);
   const [showProgressSummary, setShowProgressSummary] = useState(false);
   
-  // Initialize puzzle with solution (use Medium complexity)
-  const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[1]));
+  // Initialize puzzle with solution (use Stage 1 complexity)
+  const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]));
   
   const [puzzleDots, setPuzzleDots] = useState(() => {
     console.log('Initial puzzle generation:', {
-      complexityLevel: 1, // Medium complexity
-      complexity: COMPLEXITY_LEVELS[1],
+      complexityLevel: 0, // Stage 1 complexity
+      complexity: COMPLEXITY_LEVELS[0],
       generatedDots: initialPuzzleState.dots,
       solution: initialPuzzleState.solution,
-      expectedDots: COMPLEXITY_LEVELS[1].numDots,
+      expectedDots: COMPLEXITY_LEVELS[0].numDots,
       actualDots: initialPuzzleState.dots.length
     });
     return initialPuzzleState.dots;
@@ -107,6 +98,15 @@ export const PuzzleGame: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [gameState]);
+
+  // Clear localStorage data on initial load to ensure fresh start
+  useEffect(() => {
+    console.log('🔄 INITIAL LOAD: Clearing all stored progress data for fresh start...');
+    localStorage.removeItem('hartai-stage-times');
+    localStorage.removeItem('hartai-completions');
+    localStorage.removeItem('hartai-best-time');
+    console.log('✅ Initial load: All localStorage data cleared, starting fresh on Stage 1');
+  }, []); // Empty dependency array ensures this runs only on mount
 
   const resetGame = useCallback(() => {
     console.log('🔄 RESET: Generating new puzzle...');
