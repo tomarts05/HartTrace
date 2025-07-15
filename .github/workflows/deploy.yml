@@ -21,13 +21,11 @@ jobs:
 
       - name: Deploy to Homelab Server via Cloudflare Access SSH
         env:
-          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CF_CLIENT_ID }}
-          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
+          CLOUDFLARE_ACCESS_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
           cloudflared access ssh \
             --hostname ssh.hartash.com \
-            --client-id $CLOUDFLARE_ACCESS_CLIENT_ID \
-            --client-secret $CLOUDFLARE_ACCESS_CLIENT_SECRET \
             --command '
               set -e
 
@@ -45,7 +43,7 @@ jobs:
                 git pull origin main
               fi
 
-              # Optional: build or restart commands
+              # Optional: Build or restart commands
               # cd $TARGET_DIR
               # npm install
               # npm run build
