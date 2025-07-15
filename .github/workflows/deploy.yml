@@ -1,4 +1,4 @@
-name: Deploy Game to Homelab
+name: Deploy Game (Build & Upload Dist Only)
 
 on:
   push:
@@ -13,44 +13,41 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install & Build
+        run: |
+          npm install
+          npm run build
+
       - name: Install cloudflared
         run: |
           curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
           chmod +x cloudflared
           sudo mv cloudflared /usr/local/bin/cloudflared
 
-      - name: Start SSH Agent and Add Private Key
+      - name: Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-      - name: Start Tunnel and Deploy
+      - name: Start Tunnel and Rsync Build
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
         run: |
+          # Start tunnel to forward local port 2222 to homelab server
           cloudflared access tcp \
             --hostname ssh.hartash.com \
             --url localhost:2222 &
-          
+
+          # Wait for tunnel
           sleep 5
 
-          ssh -o StrictHostKeyChecking=no -p 2222 tomarts05@localhost << 'EOF'
-            set -e
+          # Sync only dist/ to the server
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -p 2222" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
-            TARGET_DIR="/var/www/hart.game"
-            GIT_REPO="https://github.com/tomarts05/HartTrace"
-
-            echo "🔍 Checking if directory exists..."
-            if [ ! -d "$TARGET_DIR/.git" ]; then
-              echo "📁 Fresh clone to $TARGET_DIR"
-              rm -rf "$TARGET_DIR"
-              git clone "$GIT_REPO" "$TARGET_DIR"
-            else
-              echo "🔄 Pulling latest code in $TARGET_DIR"
-              cd "$TARGET_DIR"
-              git pull origin main
-            fi
-
-            echo "✅ Deployment complete"
-          EOF
+          echo "✅ Deployed built dist/ to homelab!"
