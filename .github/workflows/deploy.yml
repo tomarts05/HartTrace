@@ -10,31 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🧰 Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: 🏗️ Install & Build
+      - name: Install Dependencies & Build
         run: |
           npm install
           npm run build
 
-      - name: ☁️ Install cloudflared
+      - name: Check if dist exists
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ dist/ folder missing!"
+            exit 1
+          fi
+
+      - name: Install cloudflared
         run: |
           curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
           chmod +x cloudflared
           sudo mv cloudflared /usr/local/bin/cloudflared
 
-      - name: 🔐 Start SSH Agent
+      - name: Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HOMELAB_DEPLOY_KEY }}
 
-      - name: 🚀 Start Tunnel, Deploy, and Restart
+      - name: Deploy via Cloudflare Tunnel
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_CLIENT_SECRET }}
@@ -44,29 +51,27 @@ jobs:
             --hostname ssh.hartash.com \
             --url localhost:2222 &
 
+          # Wait for tunnel to initialize
           sleep 5
 
           echo "🧹 Cleaning /var/www/hart.game..."
           ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
             set -e
-            mkdir -p /var/www/hart.game
-            shopt -s dotglob
-            rm -rf /var/www/hart.game/*
+            sudo mkdir -p /var/www/hart.game
+            sudo rm -rf /var/www/hart.game/*
             echo "✅ Folder cleaned"
-            exit 0
           EOF
 
           echo "📦 Deploying dist/ to /var/www/hart.game..."
-          rsync -avz -e "ssh -T -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
+          rsync -avz --delete -e "ssh -p 2222 -o StrictHostKeyChecking=no" ./dist/ tomarts05@localhost:/var/www/hart.game/
 
           echo "🔁 Reloading systemd and restarting services..."
           ssh -T -p 2222 -o StrictHostKeyChecking=no tomarts05@localhost << 'EOF'
-            set -e
-            sudo /usr/bin/systemctl daemon-reload || true
-            sudo /usr/bin/systemctl restart nginx || true
-            sudo /usr/bin/systemctl restart cloudflared || true
+            sudo systemctl daemon-reexec || true
+            sudo systemctl daemon-reload || true
+            sudo systemctl restart nginx || true
+            sudo systemctl restart cloudflared || true
             echo "✅ Services restarted"
-            exit 0
           EOF
 
           echo "✅ Deployment complete!"
