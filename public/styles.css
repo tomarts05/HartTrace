@@ -904,6 +904,14 @@ body {
   z-index: 1000;
   padding: 1rem;
   animation: fadeIn 0.3s ease-out;
+  /* Ensure proper viewport dimensions */
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  /* Remove any margins that might affect centering */
+  margin: 0;
+  /* Force perfect centering */
+  place-items: center;
 }
 
 @keyframes fadeIn {
@@ -922,15 +930,24 @@ body {
   padding: 2rem;
   text-align: center;
   color: white;
-  max-width: 500px;
+  max-width: min(90vw, 500px);
   width: 95%;
-  max-height: 90vh;
+  /* Optimize height constraints for better centering */
+  max-height: min(85vh, 85dvh);
   overflow-y: auto;
   box-shadow: 
     0 25px 50px -12px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(255, 255, 255, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   position: relative;
+  /* Ensure perfect centering */
+  margin: 0;
+  /* Remove any default transforms that might interfere */
+  transform: none;
+  /* Ensure content is vertically centered within its bounds */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .victory-content::before {
@@ -1445,8 +1462,9 @@ body {
   
   .victory-content {
     padding: 1.5rem;
-    margin: 0.5rem;
-    max-width: calc(95% - 1rem);
+    margin: 0;
+    max-width: calc(95vw - 2rem);
+    max-height: min(80vh, 80dvh);
   }
   
   .victory-title {
@@ -1505,8 +1523,9 @@ body {
   
   .victory-content {
     padding: 1rem;
-    margin: 0.25rem;
-    max-width: calc(98% - 0.5rem);
+    margin: 0;
+    max-width: calc(95vw - 1rem);
+    max-height: min(75vh, 75dvh);
   }
   
   .stage-times-grid {
@@ -1528,8 +1547,9 @@ body {
   }
   
   .victory-content {
-    max-width: 90%;
+    max-width: min(85vw, 450px);
     padding: 1.75rem;
+    margin: 0;
   }
 }
 
@@ -1541,9 +1561,9 @@ body {
   }
   
   .victory-content {
-    max-width: 95%;
+    max-width: min(90vw, 420px);
     padding: 1.5rem;
-    margin: 1rem;
+    margin: 0;
   }
   
   .timer-container-combined {
