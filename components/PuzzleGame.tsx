@@ -435,12 +435,26 @@ export const PuzzleGame: React.FC = () => {
       const col = Math.floor(svgX / currentComplexity.cellSize);
       const row = Math.floor(svgY / currentComplexity.cellSize);
       
+      // DEBUG: Log coordinate conversion details
+      console.log('🎯 CLICK DEBUG:', {
+        screen: { x: e.clientX, y: e.clientY },
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        relative: { x, y },
+        svg: { svgX, svgY, svgWidth, svgHeight },
+        grid: { row, col },
+        cellSize: currentComplexity.cellSize,
+        gridSize: currentComplexity.gridSize
+      });
+      
       // Check bounds
       if (col < 0 || col >= currentComplexity.gridSize || row < 0 || row >= currentComplexity.gridSize) {
+        console.log('❌ Click outside grid bounds:', { row, col, gridSize: currentComplexity.gridSize });
         return null;
       }
       
-      return `${row},${col}`;
+      const result = `${row},${col}`;
+      console.log('✅ Detected cell:', result);
+      return result;
     } catch (error) {
       console.warn('Error getting cell from event:', error);
       return null;
