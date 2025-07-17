@@ -6,7 +6,6 @@ import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
 import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
 import { ShareButton } from './ShareButton';
-import { ResultScreen } from './ResultScreen';
 
 type Path = { from: number; to: number; cells: string[] };
 
@@ -52,9 +51,6 @@ export const PuzzleGame: React.FC = () => {
   const [totalGameCompletions, setTotalGameCompletions] = useState<number>(0);
   const [bestTotalTime, setBestTotalTime] = useState<number>(Infinity);
   const [showProgressSummary, setShowProgressSummary] = useState(false);
-  
-  // State for new ResultScreen component
-  const [showResultScreen, setShowResultScreen] = useState(false);
   
   // Initialize puzzle with solution (use Stage 1 complexity)
   const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]));
@@ -189,13 +185,6 @@ export const PuzzleGame: React.FC = () => {
       console.log('✅ Complete reset: Stage 1, all timers cleared, all localStorage cleared');
     });
   }, [showNotification]);
-
-  // Play Again handler for ResultScreen component
-  const handlePlayAgain = useCallback(() => {
-    console.log('🔄 PLAY AGAIN: Resetting to Stage 1...');
-    setShowResultScreen(false);
-    resetAllProgress();
-  }, [resetAllProgress]);
 
   // Save current state to history (called before making changes)
   // Removed - now using simpler path-by-path undo system
@@ -1255,14 +1244,6 @@ export const PuzzleGame: React.FC = () => {
                 <span className="btn-icon">📈</span>
                 <span className="btn-text">Progress</span>
             </button>
-            <button 
-              onClick={() => setShowResultScreen(true)}
-              className="control-button result"
-              title="View Game Results"
-            >
-                <span className="btn-icon">🎯</span>
-                <span className="btn-text">Results</span>
-            </button>
           </div>
         </div>
 
@@ -1709,6 +1690,15 @@ export const PuzzleGame: React.FC = () => {
                     🔄 Try Again
                   </button>
                   
+                  {/* Share Result Button - Always available */}
+                  <ShareButton 
+                    level={complexityLevel + 1}
+                    time={globalTimer}
+                    className="victory-button share"
+                  >
+                    📲 Share Result
+                  </ShareButton>
+                  
                   <button 
                     onClick={resetAllProgress}
                     className="victory-button retry"
@@ -1722,17 +1712,6 @@ export const PuzzleGame: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* New ResultScreen Component */}
-      <ResultScreen
-        finalLevel={complexityLevel + 1}
-        totalTime={globalTimer}
-        onPlayAgain={handlePlayAgain}
-        onClose={() => setShowResultScreen(false)}
-        isVisible={showResultScreen}
-        stageCompletionTimes={stageCompletionTimes}
-        totalGameCompletions={totalGameCompletions}
-      />
     </div>
   );
 };
