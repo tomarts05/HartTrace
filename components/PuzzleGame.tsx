@@ -4,8 +4,7 @@ import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution } from '../data/puzzl
 import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
-import { useResponsive } from '../hooks/useResponsive';
-import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
+import { shouldReduceAnimations, getPerformanceMode, getScreenSizeCategory, isMobileDevice } from '../utils/mobileDetection';
 
 type Path = { from: number; to: number; cells: string[] };
 
@@ -22,14 +21,13 @@ interface PointEvent {
 }
 
 export const PuzzleGame: React.FC = () => {
-  // Responsive hook for orientation and screen size detection
-  const responsive = useResponsive();
-  
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
-  const maxPenPoints = performanceMode === 'low' ? 15 : performanceMode === 'medium' ? 25 : 40;
-  const penUpdateFrequency = performanceMode === 'low' ? 8 : performanceMode === 'medium' ? 6 : 4;
+  
+  // Mobile detection for screen size classes
+  const isMobile = isMobileDevice();
+  const screenCategory = getScreenSizeCategory();
   
   // Performance refs for throttling updates
   const penUpdateCounterRef = useRef(0);
@@ -1112,7 +1110,7 @@ export const PuzzleGame: React.FC = () => {
 
   return (
     <div 
-      className={`game-area ${responsive.isLandscapeMobile ? 'landscape-mobile' : ''} ${responsive.orientation} ${responsive.category}`}
+      className={`game-area ${isMobile ? 'mobile' : ''} ${screenCategory}`}
       onDragStart={(e) => e.preventDefault()} // Prevent drag
     >
       {/* Notification */}
@@ -1131,7 +1129,7 @@ export const PuzzleGame: React.FC = () => {
       </AnimatePresence>
       
       {/* Game Container - Mobile First Design with Responsive Classes */}
-      <div className={`game-container ${responsive.isLandscapeMobile ? 'landscape-mobile' : ''}`}>
+      <div className={`game-container ${isMobile ? 'mobile' : ''}`}>
         {/* Game Title with Inline Logo */}
         <div className="game-title">
           <h1>
