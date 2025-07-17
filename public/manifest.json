@@ -12,13 +12,13 @@
   "categories": ["games", "puzzle", "entertainment"],
   "icons": [
     {
-      "src": "/fb/icon-512.svg",
+      "src": "/fb/hart-logo.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/fb/icon-512.svg",
+      "src": "/fb/hart-logo.svg",
       "sizes": "192x192",
       "type": "image/svg+xml"
     }
