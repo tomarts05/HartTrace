@@ -1,6 +1,6 @@
 {
-  "name": "Connect the Dots - Puzzle Game",
-  "short_name": "Puzzle Game",
+  "name": "Connect the Dots - HartTrace",
+  "short_name": "HartTrace",
   "description": "Challenge your mind with this addictive puzzle game! Connect numbered dots in order while filling every cell.",
   "start_url": "/",
   "display": "fullscreen",
