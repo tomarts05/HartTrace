@@ -1,0 +1,80 @@
+/* ShareButton.css - Plain CSS styles for Facebook share button */
+
+.share-button {
+  /* Blue background as specified */
+  background-color: #1877f2;
+  border: 2px solid #1877f2;
+  
+  /* White text as specified */
+  color: white;
+  
+  /* Rounded corners as specified */
+  border-radius: 8px;
+  
+  /* Button styling */
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  /* Remove default button styles */
+  outline: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  
+  /* Mobile-friendly touch target */
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Subtle hover effect as specified */
+.share-button:hover {
+  background-color: #166fe5;
+  border-color: #166fe5;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+}
+
+.share-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(24, 119, 242, 0.3);
+}
+
+.share-button:focus {
+  box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.2);
+}
+
+/* Responsive design for mobile (basic CSS media queries) */
+@media (max-width: 768px) {
+  .share-button {
+    padding: 10px 20px;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .share-button {
+    padding: 8px 16px;
+    font-size: 13px;
+    width: 100%;
+    max-width: 200px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .share-button {
+    background-color: #1877f2;
+    border-color: #1877f2;
+  }
+  
+  .share-button:hover {
+    background-color: #166fe5;
+    border-color: #166fe5;
+  }
+}
