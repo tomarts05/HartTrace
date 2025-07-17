@@ -597,6 +597,45 @@ export const PuzzleGame: React.FC = () => {
         }
       }
     } else {
+      // TOLERANCE FIX: Check if click is close to the start dot (within 1 cell tolerance)
+      // This handles coordinate precision issues and improves user experience
+      const [startRow, startCol] = startDotCell.split(',').map(Number);
+      const [clickRow, clickCol] = cell.split(',').map(Number);
+      const rowDiff = Math.abs(startRow - clickRow);
+      const colDiff = Math.abs(startCol - clickCol);
+      
+      // Allow clicking within 2 cells of the target dot as a tolerance for better UX
+      if (rowDiff <= 2 && colDiff <= 2) {
+        console.log('🎯 TOLERANCE MATCH: Click close enough to dot', nextDotNumber, 'expected', startDotCell, 'got', cell);
+        
+        // Use the actual dot position instead of clicked position
+        setCurrentPath([startDotCell]);
+        const dotCenter = getCenterOfCell(startDotCell);
+        penPathRef.current = [dotCenter];
+        setIsDrawing(true);
+        
+        console.log('🎯 Drawing STARTED with tolerance from dot', nextDotNumber, 'at cell', startDotCell);
+        
+        if (svgRef.current) {
+          try {
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = point.clientX - rect.left;
+            const y = point.clientY - rect.top;
+            
+            const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
+            const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
+            
+            const svgX = (x / rect.width) * svgWidth;
+            const svgY = (y / rect.height) * svgHeight;
+            
+            setCursorPos({ x: svgX, y: svgY });
+          } catch (error) {
+            console.warn('Error setting initial cursor position:', error);
+          }
+        }
+        return;
+      }
+      
       // Check if user clicked on any numbered dot (but wrong one)
       const clickedDot = puzzleDots.find(d => cell === `${d.row},${d.col}`);
       if (clickedDot) {
