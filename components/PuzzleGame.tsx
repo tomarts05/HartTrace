@@ -4,7 +4,7 @@ import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution } from '../data/puzzl
 import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
-import { shouldReduceAnimations, getPerformanceMode, getScreenSizeCategory, isMobileDevice } from '../utils/mobileDetection';
+import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
 
 type Path = { from: number; to: number; cells: string[] };
 
@@ -23,10 +23,8 @@ export const PuzzleGame: React.FC = () => {
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
-  
-  // Mobile detection for screen size classes
-  const isMobile = isMobileDevice();
-  const screenCategory = getScreenSizeCategory();
+  const maxPenPoints = performanceMode === 'low' ? 15 : performanceMode === 'medium' ? 25 : 40;
+  const penUpdateFrequency = performanceMode === 'low' ? 8 : performanceMode === 'medium' ? 6 : 4;
   
   // Performance refs for throttling updates
   const penUpdateCounterRef = useRef(0);
@@ -1148,7 +1146,7 @@ export const PuzzleGame: React.FC = () => {
 
   return (
     <div 
-      className={`game-area ${isMobile ? 'mobile' : ''} ${screenCategory}`}
+      className="game-area"
       onDragStart={(e) => e.preventDefault()} // Prevent drag
     >
       {/* Notification */}
@@ -1166,8 +1164,8 @@ export const PuzzleGame: React.FC = () => {
         )}
       </AnimatePresence>
       
-      {/* Game Container - Mobile First Design with Responsive Classes */}
-      <div className={`game-container ${isMobile ? 'mobile' : ''}`}>
+      {/* Game Container - Mobile First Design */}
+      <div className="game-container">
         {/* Game Title with Inline Logo */}
         <div className="game-title">
           <h1>
