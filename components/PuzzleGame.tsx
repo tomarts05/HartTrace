@@ -435,26 +435,12 @@ export const PuzzleGame: React.FC = () => {
       const col = Math.floor(svgX / currentComplexity.cellSize);
       const row = Math.floor(svgY / currentComplexity.cellSize);
       
-      // DEBUG: Log coordinate conversion details
-      console.log('🎯 CLICK DEBUG:', {
-        screen: { x: e.clientX, y: e.clientY },
-        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-        relative: { x, y },
-        svg: { svgX, svgY, svgWidth, svgHeight },
-        grid: { row, col },
-        cellSize: currentComplexity.cellSize,
-        gridSize: currentComplexity.gridSize
-      });
-      
       // Check bounds
       if (col < 0 || col >= currentComplexity.gridSize || row < 0 || row >= currentComplexity.gridSize) {
-        console.log('❌ Click outside grid bounds:', { row, col, gridSize: currentComplexity.gridSize });
         return null;
       }
       
-      const result = `${row},${col}`;
-      console.log('✅ Detected cell:', result);
-      return result;
+      return `${row},${col}`;
     } catch (error) {
       console.warn('Error getting cell from event:', error);
       return null;
@@ -611,6 +597,45 @@ export const PuzzleGame: React.FC = () => {
         }
       }
     } else {
+      // TOLERANCE FIX: Check if click is close to the start dot (within 1 cell tolerance)
+      // This handles coordinate precision issues and improves user experience
+      const [startRow, startCol] = startDotCell.split(',').map(Number);
+      const [clickRow, clickCol] = cell.split(',').map(Number);
+      const rowDiff = Math.abs(startRow - clickRow);
+      const colDiff = Math.abs(startCol - clickCol);
+      
+      // Allow clicking within 2 cells of the target dot as a tolerance for better UX
+      if (rowDiff <= 2 && colDiff <= 2) {
+        console.log('🎯 TOLERANCE MATCH: Click close enough to dot', nextDotNumber, 'expected', startDotCell, 'got', cell);
+        
+        // Use the actual dot position instead of clicked position
+        setCurrentPath([startDotCell]);
+        const dotCenter = getCenterOfCell(startDotCell);
+        penPathRef.current = [dotCenter];
+        setIsDrawing(true);
+        
+        console.log('🎯 Drawing STARTED with tolerance from dot', nextDotNumber, 'at cell', startDotCell);
+        
+        if (svgRef.current) {
+          try {
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = point.clientX - rect.left;
+            const y = point.clientY - rect.top;
+            
+            const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
+            const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
+            
+            const svgX = (x / rect.width) * svgWidth;
+            const svgY = (y / rect.height) * svgHeight;
+            
+            setCursorPos({ x: svgX, y: svgY });
+          } catch (error) {
+            console.warn('Error setting initial cursor position:', error);
+          }
+        }
+        return;
+      }
+      
       // Check if user clicked on any numbered dot (but wrong one)
       const clickedDot = puzzleDots.find(d => cell === `${d.row},${d.col}`);
       if (clickedDot) {
