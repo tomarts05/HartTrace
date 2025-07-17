@@ -1,154 +1,95 @@
-<!-- HartTrace Game Share Image - Matches actual game interface -->
+<!-- HartTrace Game Share Image - Natural screenshot-based design -->
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Gradient backgrounds for glassmorphism effect -->
+    <!-- Simple dark background gradient -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f0f23;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#1a1a2e;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#0f0f23;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- Glassmorphism card gradient -->
-    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:rgba(255,255,255,0.1);stop-opacity:1" />
-      <stop offset="100%" style="stop-color:rgba(255,255,255,0.05);stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
     </linearGradient>
     
     <!-- Game grid background -->
     <linearGradient id="gridBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#2a2a3a;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#1a1a2a;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#334155;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
     </linearGradient>
-    
-    <!-- Blur filter for glassmorphism -->
-    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="1"/>
-    </filter>
   </defs>
   
   <!-- Main background -->
   <rect width="1200" height="630" fill="url(#bgGradient)"/>
   
-  <!-- Background glow effect -->
-  <circle cx="600" cy="315" r="400" fill="rgba(59,130,246,0.03)" opacity="0.8"/>
-  
-  <!-- HartTrace Logo Section -->
-  <g transform="translate(600, 80)">
-    <!-- Logo Circle -->
-    <circle cx="0" cy="0" r="20" fill="#04B6F1"/>
-    <path d="M-8,-5 L8,-5 L8,5 L-8,5 Z M-15,0 L-8,0 M8,0 L15,0" stroke="white" stroke-width="2" fill="none"/>
-    <!-- Logo Text -->
-    <text x="30" y="8" fill="white" font-size="28" font-weight="bold" font-family="Arial, sans-serif">HartTrace</text>
+  <!-- HartTrace Logo -->
+  <g transform="translate(600, 100)">
+    <circle cx="0" cy="0" r="25" fill="#04B6F1"/>
+    <path d="M-10,-6 L10,-6 L10,6 L-10,6 Z M-18,0 L-10,0 M10,0 L18,0" stroke="white" stroke-width="2.5" fill="none"/>
+    <text x="35" y="8" fill="white" font-size="32" font-weight="bold" font-family="Arial, sans-serif">HartTrace</text>
   </g>
   
-  <!-- Main game interface container -->
-  <g transform="translate(200, 120)">
-    <!-- Glassmorphism card background -->
-    <rect x="0" y="0" width="800" height="460" fill="url(#cardGradient)" 
-          stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="20" 
-          filter="url(#blur)" opacity="0.9"/>
+  <!-- Stage info -->
+  <text x="600" y="170" text-anchor="middle" fill="#fbbf24" font-size="20" font-weight="bold" font-family="Arial, sans-serif">Stage 5 - Diamond Pattern</text>
+  
+  <!-- Main game grid (5x5 based on actual screenshot) -->
+  <g transform="translate(450, 200)">
+    <!-- Grid background -->
+    <rect x="0" y="0" width="300" height="300" fill="url(#gridBg)" rx="8"/>
     
-    <!-- Game info section -->
-    <g transform="translate(50, 40)">
-      <!-- Stage info -->
-      <g>
-        <text x="0" y="0" fill="#fbbf24" font-size="18" font-weight="bold">🏆 Stage 5</text>
-        <text x="120" y="0" fill="#94a3b8" font-size="16"> - Diamond: 6 dots, 5×5 grid</text>
-      </g>
+    <!-- Grid lines (5x5) -->
+    <g stroke="rgba(100, 116, 139, 0.4)" stroke-width="1">
+      <!-- Vertical lines -->
+      <line x1="60" y1="0" x2="60" y2="300"/>
+      <line x1="120" y1="0" x2="120" y2="300"/>
+      <line x1="180" y1="0" x2="180" y2="300"/>
+      <line x1="240" y1="0" x2="240" y2="300"/>
       
-      <!-- Timer section -->
-      <g transform="translate(0, 35)">
-        <!-- Stage timer -->
-        <rect x="0" y="0" width="120" height="35" fill="rgba(100,116,139,0.4)" rx="8"/>
-        <text x="10" y="12" fill="#94a3b8" font-size="10">⏱</text>
-        <text x="30" y="25" fill="#22d3ee" font-size="16" font-weight="bold">00:28</text>
-        
-        <!-- Total timer -->
-        <rect x="140" y="0" width="140" height="35" fill="rgba(100,116,139,0.4)" rx="8"/>
-        <text x="150" y="12" fill="#94a3b8" font-size="10">💎 Total:</text>
-        <text x="210" y="25" fill="#22d3ee" font-size="16" font-weight="bold">00:42</text>
-      </g>
-      
-      <!-- Control buttons -->
-      <g transform="translate(0, 90)">
-        <!-- Reset button -->
-        <rect x="0" y="0" width="80" height="35" fill="rgba(100,116,139,0.6)" rx="6"/>
-        <text x="40" y="23" text-anchor="middle" fill="#e2e8f0" font-size="12">🔄 Reset</text>
-        
-        <!-- Reset All button -->
-        <rect x="100" y="0" width="100" height="35" fill="rgba(239,68,68,0.8)" rx="6"/>
-        <text x="150" y="23" text-anchor="middle" fill="white" font-size="12">💥 Reset All</text>
-        
-        <!-- Undo button -->
-        <rect x="220" y="0" width="70" height="35" fill="rgba(100,116,139,0.6)" rx="6"/>
-        <text x="255" y="23" text-anchor="middle" fill="#e2e8f0" font-size="12">↶ Undo</text>
-        
-        <!-- Progress button -->
-        <rect x="310" y="0" width="85" height="35" fill="rgba(100,116,139,0.6)" rx="6"/>
-        <text x="352" y="23" text-anchor="middle" fill="#e2e8f0" font-size="12">📊 Progress</text>
-      </g>
+      <!-- Horizontal lines -->
+      <line x1="0" y1="60" x2="300" y2="60"/>
+      <line x1="0" y1="120" x2="300" y2="120"/>
+      <line x1="0" y1="180" x2="300" y2="180"/>
+      <line x1="0" y1="240" x2="300" y2="240"/>
     </g>
     
-    <!-- Game grid section -->
-    <g transform="translate(100, 180)">
-      <!-- Grid background -->
-      <rect x="0" y="0" width="300" height="220" fill="url(#gridBg)" 
-            stroke="rgba(100,116,139,0.3)" stroke-width="1" rx="10"/>
-      
-      <!-- Grid lines -->
-      <g stroke="rgba(100,116,139,0.2)" stroke-width="1">
-        <!-- Vertical lines -->
-        <line x1="60" y1="20" x2="60" y2="200"/>
-        <line x1="120" y1="20" x2="120" y2="200"/>
-        <line x1="180" y1="20" x2="180" y2="200"/>
-        <line x1="240" y1="20" x2="240" y2="200"/>
-        <!-- Horizontal lines -->
-        <line x1="20" y1="60" x2="280" y2="60"/>
-        <line x1="20" y1="100" x2="280" y2="100"/>
-        <line x1="20" y1="140" x2="280" y2="140"/>
-        <line x1="20" y1="180" x2="280" y2="180"/>
-      </g>
-      
-      <!-- Game path (blue connection) -->
-      <path d="M 60 40 L 120 40 L 180 40 L 240 40 L 240 80 L 240 120 L 180 120 L 120 120 L 60 120 L 60 160 L 120 160 L 180 160" 
-            stroke="#22d3ee" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.8"/>
-      
-      <!-- Dots with numbers -->
-      <!-- START dot (already connected) -->
-      <circle cx="60" cy="100" r="18" fill="#10b981" stroke="#22d3ee" stroke-width="3"/>
-      <text x="60" y="107" text-anchor="middle" fill="white" font-size="12" font-weight="bold">START</text>
-      
-      <!-- Dot 2 -->
-      <circle cx="180" cy="100" r="15" fill="#22d3ee"/>
-      <text x="180" y="106" text-anchor="middle" fill="white" font-size="14" font-weight="bold">2</text>
-      
-      <!-- Dot 3 -->
-      <circle cx="120" cy="40" r="15" fill="#22d3ee"/>
-      <text x="120" y="46" text-anchor="middle" fill="white" font-size="14" font-weight="bold">3</text>
-      
-      <!-- Dot 4 -->
-      <circle cx="240" cy="120" r="15" fill="#22d3ee"/>
-      <text x="240" y="126" text-anchor="middle" fill="white" font-size="14" font-weight="bold">4</text>
-      
-      <!-- Dot 5 -->
-      <circle cx="120" cy="160" r="15" fill="#22d3ee"/>
-      <text x="120" y="166" text-anchor="middle" fill="white" font-size="14" font-weight="bold">5</text>
-      
-      <!-- END dot (dashed red circle) -->
-      <circle cx="240" cy="160" r="18" fill="none" stroke="#ef4444" stroke-width="3" 
-              stroke-dasharray="4,2" opacity="0.8"/>
-      <text x="240" y="166" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="bold">END</text>
+    <!-- Dots positioned in diamond pattern (based on screenshot) -->
+    <!-- Dot 1 (START) - center position -->
+    <g transform="translate(150, 150)">
+      <circle cx="0" cy="0" r="20" fill="#22d3ee" stroke="#0891b2" stroke-width="3"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="16" font-weight="bold" font-family="Arial, sans-serif">1</text>
+      <text x="0" y="38" text-anchor="middle" fill="#10b981" font-size="12" font-weight="bold" font-family="Arial, sans-serif">START</text>
     </g>
     
-    <!-- Instructions section -->
-    <g transform="translate(50, 420)">
-      <text x="0" y="0" fill="#e2e8f0" font-size="16" font-weight="bold">Connect dots 1(START) to 6 (END)</text>
-      <text x="350" y="0" fill="#fbbf24" font-size="16" font-weight="bold">• Fill every cell to win!</text>
-      
-      <text x="150" y="25" text-anchor="middle" fill="#94a3b8" font-size="12">💡 Tap Undo/Redo or use Ctrl+Z/Y</text>
+    <!-- Dot 2 - right of center -->
+    <g transform="translate(210, 150)">
+      <circle cx="0" cy="0" r="18" fill="#64748b" stroke="#475569" stroke-width="2"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial, sans-serif">2</text>
+    </g>
+    
+    <!-- Dot 3 - top -->
+    <g transform="translate(150, 90)">
+      <circle cx="0" cy="0" r="18" fill="#64748b" stroke="#475569" stroke-width="2"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial, sans-serif">3</text>
+    </g>
+    
+    <!-- Dot 4 - top right -->
+    <g transform="translate(210, 90)">
+      <circle cx="0" cy="0" r="18" fill="#64748b" stroke="#475569" stroke-width="2"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial, sans-serif">4</text>
+    </g>
+    
+    <!-- Dot 5 - left of center -->
+    <g transform="translate(90, 150)">
+      <circle cx="0" cy="0" r="18" fill="#64748b" stroke="#475569" stroke-width="2"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial, sans-serif">5</text>
+    </g>
+    
+    <!-- Dot 6 (END) - bottom -->
+    <g transform="translate(150, 210)">
+      <circle cx="0" cy="0" r="18" fill="#dc2626" stroke="#b91c1c" stroke-width="2"/>
+      <text x="0" y="6" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial, sans-serif">6</text>
+      <text x="0" y="35" text-anchor="middle" fill="#dc2626" font-size="12" font-weight="bold" font-family="Arial, sans-serif">END</text>
     </g>
   </g>
+  
+  <!-- Instructions -->
+  <text x="600" y="550" text-anchor="middle" fill="white" font-size="18" font-family="Arial, sans-serif">Connect dots 1 (START) to 6 (END) • Fill every cell to win!</text>
   
   <!-- Call to action -->
-  <text x="600" y="600" text-anchor="middle" fill="#22d3ee" font-size="24" font-weight="bold">Play HartTrace on Facebook Instant Games!</text>
+  <text x="600" y="590" text-anchor="middle" fill="#22d3ee" font-size="20" font-weight="bold" font-family="Arial, sans-serif">Play HartTrace on Facebook Instant Games!</text>
 </svg>
