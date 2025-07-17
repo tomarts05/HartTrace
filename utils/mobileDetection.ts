@@ -8,6 +8,34 @@ export const isMobileDevice = (): boolean => {
   return hasTouch && (isSmallScreen || isMobileUserAgent);
 };
 
+export const getScreenOrientation = (): 'portrait' | 'landscape' => {
+  return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+};
+
+export const getScreenSizeCategory = (): 'small' | 'medium' | 'large' | 'xlarge' => {
+  const width = window.innerWidth;
+  if (width < 480) return 'small';
+  if (width < 768) return 'medium';
+  if (width < 1024) return 'large';
+  return 'xlarge';
+};
+
+export const isLandscapeMobile = (): boolean => {
+  return isMobileDevice() && getScreenOrientation() === 'landscape';
+};
+
+export const getViewportDimensions = () => {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    aspectRatio: window.innerWidth / window.innerHeight,
+    orientation: getScreenOrientation(),
+    category: getScreenSizeCategory(),
+    isMobile: isMobileDevice(),
+    isLandscapeMobile: isLandscapeMobile()
+  };
+};
+
 export const getPerformanceMode = (): 'high' | 'medium' | 'low' => {
   if (!isMobileDevice()) return 'high';
   

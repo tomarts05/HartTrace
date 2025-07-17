@@ -4,6 +4,7 @@ import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution } from '../data/puzzl
 import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
+import { useResponsive } from '../hooks/useResponsive';
 import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
 
 type Path = { from: number; to: number; cells: string[] };
@@ -21,6 +22,9 @@ interface PointEvent {
 }
 
 export const PuzzleGame: React.FC = () => {
+  // Responsive hook for orientation and screen size detection
+  const responsive = useResponsive();
+  
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
@@ -1108,7 +1112,7 @@ export const PuzzleGame: React.FC = () => {
 
   return (
     <div 
-      className="game-area"
+      className={`game-area ${responsive.isLandscapeMobile ? 'landscape-mobile' : ''} ${responsive.orientation} ${responsive.category}`}
       onDragStart={(e) => e.preventDefault()} // Prevent drag
     >
       {/* Notification */}
@@ -1126,8 +1130,8 @@ export const PuzzleGame: React.FC = () => {
         )}
       </AnimatePresence>
       
-      {/* Game Container - Mobile First Design */}
-      <div className="game-container">
+      {/* Game Container - Mobile First Design with Responsive Classes */}
+      <div className={`game-container ${responsive.isLandscapeMobile ? 'landscape-mobile' : ''}`}>
         {/* Game Title with Inline Logo */}
         <div className="game-title">
           <h1>
