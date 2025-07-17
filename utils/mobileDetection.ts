@@ -8,14 +8,6 @@ export const isMobileDevice = (): boolean => {
   return hasTouch && (isSmallScreen || isMobileUserAgent);
 };
 
-export const getScreenSizeCategory = (): 'small' | 'medium' | 'large' | 'xlarge' => {
-  const width = window.innerWidth;
-  if (width < 480) return 'small';
-  if (width < 768) return 'medium';
-  if (width < 1024) return 'large';
-  return 'xlarge';
-};
-
 export const getPerformanceMode = (): 'high' | 'medium' | 'low' => {
   if (!isMobileDevice()) return 'high';
   
