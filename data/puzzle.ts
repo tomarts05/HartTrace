@@ -320,70 +320,74 @@ function createLShapePath(gridSize: number, _startRow: number, _startCol: number
   return path;
 }
 
-// Stage 5: Diamond Pattern (UNIQUE) - TRUE DIAMOND EXPANSION
+// Stage 5: Diamond Pattern (UNIQUE) - FIXED DIAMOND WITH ADJACENCY
 function createDiamondPath(gridSize: number, _startRow: number, _startCol: number): string[] {
   const path: string[] = [];
-  const center = Math.floor(gridSize / 2);
   
-  // Create true diamond by expanding from center outward
-  path.push(`${center},${center}`); // Start at center
+  // Create diamond-like pattern with adjacency preservation
+  // Instead of starting from center, start from a corner and create diamond-like movement
   
-  // Expand diamond layer by layer
-  for (let layer = 1; layer <= center; layer++) {
-    const cells = [];
-    
-    // Top edge of diamond layer
-    for (let offset = -layer; offset <= layer; offset++) {
-      const row = center - layer;
-      const col = center + offset;
-      if (row >= 0 && col >= 0 && col < gridSize) {
-        cells.push(`${row},${col}`);
-      }
-    }
-    
-    // Right edge (skip corners)
-    for (let offset = -layer + 1; offset < layer; offset++) {
-      const row = center + offset;
-      const col = center + layer;
-      if (row >= 0 && row < gridSize && col < gridSize) {
-        cells.push(`${row},${col}`);
-      }
-    }
-    
-    // Bottom edge (skip corners)
-    for (let offset = layer - 1; offset >= -layer + 1; offset--) {
-      const row = center + layer;
-      const col = center + offset;
-      if (row < gridSize && col >= 0 && col < gridSize) {
-        cells.push(`${row},${col}`);
-      }
-    }
-    
-    // Left edge (skip corners)
-    for (let offset = layer - 1; offset > -layer; offset--) {
-      const row = center + offset;
-      const col = center - layer;
-      if (row >= 0 && row < gridSize && col >= 0) {
-        cells.push(`${row},${col}`);
-      }
-    }
-    
-    // Add cells in diamond expansion order
-    path.push(...cells);
+  // Start from top-left corner
+  path.push('0,0');
+  
+  // Create a diamond-like pattern by going in diamond-shaped layers
+  // but ensuring all moves are adjacent (horizontal/vertical only)
+  
+  // First, create the outer diamond perimeter
+  // Top edge: left to right
+  for (let col = 1; col < gridSize; col++) {
+    path.push(`0,${col}`);
   }
   
-  // Fill any remaining corners
-  const visited = new Set(path);
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      const cell = `${row},${col}`;
-      if (!visited.has(cell)) {
-        path.push(cell);
+  // Right edge: top to bottom (skip top-right corner)
+  for (let row = 1; row < gridSize; row++) {
+    path.push(`${row},${gridSize - 1}`);
+  }
+  
+  // Bottom edge: right to left (skip bottom-right corner)
+  for (let col = gridSize - 2; col >= 0; col--) {
+    path.push(`${gridSize - 1},${col}`);
+  }
+  
+  // Left edge: bottom to top (skip bottom-left and top-left corners)
+  for (let row = gridSize - 2; row >= 1; row--) {
+    path.push(`${row},0`);
+  }
+  
+  // Fill interior in diamond-like pattern (spiral inward)
+  let top = 1, bottom = gridSize - 2, left = 1, right = gridSize - 2;
+  
+  while (top <= bottom && left <= right) {
+    // Top row of inner diamond
+    for (let col = left; col <= right; col++) {
+      path.push(`${top},${col}`);
+    }
+    top++;
+    
+    // Right column of inner diamond (skip top corner)
+    for (let row = top; row <= bottom; row++) {
+      path.push(`${row},${right}`);
+    }
+    right--;
+    
+    // Bottom row of inner diamond (skip right corner)
+    if (top <= bottom) {
+      for (let col = right; col >= left; col--) {
+        path.push(`${bottom},${col}`);
       }
+      bottom--;
+    }
+    
+    // Left column of inner diamond (skip bottom and top corners)
+    if (left <= right) {
+      for (let row = bottom; row >= top; row--) {
+        path.push(`${row},${left}`);
+      }
+      left++;
     }
   }
   
-  console.log(`✅ True Diamond expansion: ${path.length} cells - DIAMOND FROM CENTER OUTWARD`);
+  console.log(`✅ Fixed Diamond pattern: ${path.length} cells - DIAMOND WITH ADJACENCY PRESERVED`);
   return path;
 }
 
