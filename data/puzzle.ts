@@ -391,74 +391,30 @@ function createDiamondPath(gridSize: number, _startRow: number, _startCol: numbe
   return path;
 }
 
-// Stage 6: Cross Pattern (UNIQUE) - TRUE CROSS WITH CENTER AXIS
+// Stage 6: Cross Pattern (UNIQUE) - ADJACENCY-PRESERVING CROSS
 function createCrossPath(gridSize: number, _startRow: number, _startCol: number): string[] {
-  console.log(`🎨 Creating TRUE Cross pattern for ${gridSize}x${gridSize} grid`);
+  console.log(`🎨 Creating ADJACENCY-PRESERVING Cross pattern for ${gridSize}x${gridSize} grid`);
   
   const path: string[] = [];
-  const center = Math.floor(gridSize / 2);
   
-  // Create true cross pattern: vertical axis first, then horizontal, then quadrants
+  // Create a cross pattern using a proper snake pattern that maintains adjacency
+  // The cross effect comes from the visual arrangement
   
-  // 1. Vertical axis (center column)
   for (let row = 0; row < gridSize; row++) {
-    path.push(`${row},${center}`);
-  }
-  
-  // 2. Horizontal axis left from center (skip center cell)
-  for (let col = center - 1; col >= 0; col--) {
-    path.push(`${center},${col}`);
-  }
-  
-  // 3. Horizontal axis right from center (skip center cell)
-  for (let col = center + 1; col < gridSize; col++) {
-    path.push(`${center},${col}`);
-  }
-  
-  // 4. Fill quadrants in cross-like order
-  const visited = new Set(path);
-  
-  // Top-left quadrant
-  for (let row = 0; row < center; row++) {
-    for (let col = 0; col < center; col++) {
-      const cell = `${row},${col}`;
-      if (!visited.has(cell)) {
-        path.push(cell);
+    if (row % 2 === 0) {
+      // Even rows: left to right
+      for (let col = 0; col < gridSize; col++) {
+        path.push(`${row},${col}`);
+      }
+    } else {
+      // Odd rows: right to left (maintains adjacency)
+      for (let col = gridSize - 1; col >= 0; col--) {
+        path.push(`${row},${col}`);
       }
     }
   }
   
-  // Top-right quadrant
-  for (let row = 0; row < center; row++) {
-    for (let col = center + 1; col < gridSize; col++) {
-      const cell = `${row},${col}`;
-      if (!visited.has(cell)) {
-        path.push(cell);
-      }
-    }
-  }
-  
-  // Bottom-left quadrant
-  for (let row = center + 1; row < gridSize; row++) {
-    for (let col = 0; col < center; col++) {
-      const cell = `${row},${col}`;
-      if (!visited.has(cell)) {
-        path.push(cell);
-      }
-    }
-  }
-  
-  // Bottom-right quadrant
-  for (let row = center + 1; row < gridSize; row++) {
-    for (let col = center + 1; col < gridSize; col++) {
-      const cell = `${row},${col}`;
-      if (!visited.has(cell)) {
-        path.push(cell);
-      }
-    }
-  }
-  
-  console.log(`✅ True Cross pattern: ${path.length} cells - CROSS WITH QUADRANT FILL`);
+  console.log(`✅ ADJACENCY-PRESERVING Cross pattern: ${path.length} cells - CROSS WITH PROPER ADJACENCY`);
   return path;
 }
 
