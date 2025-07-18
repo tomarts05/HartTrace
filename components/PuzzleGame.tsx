@@ -412,6 +412,40 @@ export const PuzzleGame: React.FC = () => {
     }
   }, [complexityLevel, showNotification]);
 
+  // TEMPORARY DEV FUNCTION: Jump to Stage 5 for testing
+  const jumpToStage5 = useCallback(() => {
+    const targetLevel = 4; // Stage 5 is index 4
+    const newComplexity = COMPLEXITY_LEVELS[targetLevel];
+    
+    console.log('🔧 DEV: Jumping to Stage 5 (Diamond Pattern)');
+    console.log('🎯 NEW COMPLEXITY:', newComplexity);
+    
+    try {
+      const puzzleResult = generateRandomDotsWithSolution(newComplexity);
+      
+      // Immediate state updates
+      setComplexityLevel(targetLevel);
+      setPuzzleDots(puzzleResult.dots);
+      setValidatedSolution(puzzleResult.fullSolution);
+      setPuzzleId(prev => prev + 1);
+      setPaths([]);
+      setCurrentPath([]);
+      penPathRef.current = [];
+      setIsDrawing(false);
+      setCursorPos(null);
+      setTimer(0);
+      setGameState(GAME_STATE.IDLE);
+      setShowTip(false);
+      setSolutionPath([]);
+      
+      console.log('✅ JUMPED TO STAGE 5 successfully');
+      console.log('🎯 Diamond pattern generated with dots:', puzzleResult.dots);
+      
+    } catch (error) {
+      console.error('❌ STAGE 5 JUMP ERROR:', error);
+    }
+  }, []);
+
   // Removed startNewGame function since New button was removed
 
   const getCellFromEvent = useCallback((e: PointEvent): string | null => {
@@ -1243,6 +1277,17 @@ export const PuzzleGame: React.FC = () => {
             >
                 <span className="btn-icon">📈</span>
                 <span className="btn-text">Progress</span>
+            </button>
+            
+            {/* TEMPORARY DEV BUTTON - TEST STAGE 5 */}
+            <button 
+              onClick={jumpToStage5}
+              className="control-button progress"
+              title="Jump to Stage 5 (Diamond Pattern)"
+              style={{ backgroundColor: '#f59e0b', borderColor: '#f59e0b' }}
+            >
+                <span className="btn-icon">🧪</span>
+                <span className="btn-text">Stage 5</span>
             </button>
           </div>
         </div>
