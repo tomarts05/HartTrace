@@ -806,7 +806,32 @@ export const PuzzleGame: React.FC = () => {
       // Complete the current path to this dot
       const newPath: Path = { from: currentDotNum, to: nextDotNum, cells: [...newCurrentPath] };
       const newPaths = [...paths, newPath];
-      setPaths(newPaths);
+      
+      // Batch all state updates together to prevent visual flicker
+      React.startTransition(() => {
+        setPaths(newPaths);
+        
+        // Continue drawing from this dot if there are more dots
+        if (nextDotNum < puzzleDots.length) {
+          // Rule 3: Visit numbered cells in ascending order
+          // Continue the path from this dot to maintain visual continuity
+          console.log('Continuing to draw from dot', nextDotNum, 'at cell', cell);
+          setCurrentPath([cell]); // Start next segment from this dot
+        } else {
+          console.log('All dots connected! Finishing drawing.');
+          setCurrentPath([]);
+          setIsDrawing(false);
+          setCursorPos(null);
+        }
+      });
+      
+      // Handle ref updates outside of React.startTransition to maintain performance
+      if (nextDotNum < puzzleDots.length) {
+        const dotCenter = getCenterOfCell(cell);
+        penPathRef.current = [dotCenter]; // Reset pen path from new dot center
+      } else {
+        penPathRef.current = [];
+      }
       
       // Check if this was the last dot AND if all cells are filled
       const isLastDot = nextDotNum === puzzleDots.length;
@@ -891,24 +916,8 @@ export const PuzzleGame: React.FC = () => {
         setIsDrawing(false);
         setCursorPos(null);
         return;
-      }
-      
-      // Continue drawing from this dot if there are more dots
-      if (nextDotNum < puzzleDots.length) {
-        // Rule 3: Visit numbered cells in ascending order
-        // Continue the path from this dot to maintain visual continuity
-        console.log('Continuing to draw from dot', nextDotNum, 'at cell', cell);
-        setCurrentPath([cell]); // Start next segment from this dot
-        const dotCenter = getCenterOfCell(cell);
-        penPathRef.current = [dotCenter]; // Reset pen path from new dot center
-      } else {
-        console.log('All dots connected! Finishing drawing.');
-        setCurrentPath([]);
-        penPathRef.current = [];
-        setIsDrawing(false);
-        setCursorPos(null);
-      }
-      return;
+    }
+
     }
 
     // Handle backtracking (moving back one cell) - more reliable logic
