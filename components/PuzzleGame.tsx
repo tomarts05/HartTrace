@@ -913,6 +913,8 @@ export const PuzzleGame: React.FC = () => {
     ));
   }, [currentComplexity.gridSize, currentComplexity.cellSize]);
 
+  const nextDot = puzzleDots[paths.length];
+
   // Memoized dots rendering for better performance
   const dotsElements = useMemo(() => {
     return puzzleDots.map(({ num, row, col }) => {
@@ -981,8 +983,6 @@ export const PuzzleGame: React.FC = () => {
       );
     });
   }, [puzzleDots, occupiedCells, currentPath, nextDot, puzzleId, currentComplexity.cellSize, reducedAnimations, gameState, isDrawing]);
-
-  const nextDot = puzzleDots[paths.length];
 
   // Debug logging for game state changes
   useEffect(() => {
