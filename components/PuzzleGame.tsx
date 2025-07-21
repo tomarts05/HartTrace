@@ -24,9 +24,11 @@ export const PuzzleGame: React.FC = () => {
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
   
-  // Performance refs for throttling updates
+  // Performance refs for throttling updates and caching
   const lastUpdateRef = useRef(0);
   const updateThrottle = performanceMode === 'low' ? 100 : performanceMode === 'medium' ? 66 : 33;
+  const svgRectCacheRef = useRef<{ rect: DOMRect; timestamp: number } | null>(null);
+  const RECT_CACHE_DURATION = 100; // Cache getBoundingClientRect for 100ms
   
   // Facebook Instant Games integration
   const [fbState, fbActions] = useFBInstant();
@@ -411,11 +413,31 @@ export const PuzzleGame: React.FC = () => {
     console.log('🎲 NEW GAME: Complete!');
   }, [currentComplexity, complexityLevel, showNotification, fbActions]);
 
+  // Optimized coordinate calculation with caching
+  const getCachedSVGRect = useCallback(() => {
+    if (!svgRef.current) return null;
+    
+    const now = performance.now();
+    const cache = svgRectCacheRef.current;
+    
+    // Use cached rect if it's fresh (within RECT_CACHE_DURATION)
+    if (cache && (now - cache.timestamp) < RECT_CACHE_DURATION) {
+      return cache.rect;
+    }
+    
+    // Get fresh rect and cache it
+    const rect = svgRef.current.getBoundingClientRect();
+    svgRectCacheRef.current = { rect, timestamp: now };
+    return rect;
+  }, []);
+
   const getCellFromEvent = useCallback((e: PointEvent): string | null => {
     if (!svgRef.current) return null;
     
     try {
-      const rect = svgRef.current.getBoundingClientRect();
+      const rect = getCachedSVGRect();
+      if (!rect) return null;
+      
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       
@@ -441,15 +463,16 @@ export const PuzzleGame: React.FC = () => {
       console.warn('Error getting cell from event:', error);
       return null;
     }
-  }, [currentComplexity]);
+  }, [currentComplexity, getCachedSVGRect]);
 
-  const getCenterOfCell = (cell: string): { x: number, y: number } => {
+  // Memoized cell center calculation for better performance
+  const getCenterOfCell = useCallback((cell: string): { x: number, y: number } => {
     const [row, col] = cell.split(',').map(Number);
     return {
       x: col * currentComplexity.cellSize + currentComplexity.cellSize / 2,
       y: row * currentComplexity.cellSize + currentComplexity.cellSize / 2,
     };
-  };
+  }, [currentComplexity.cellSize]);
 
   const handleInteractionStart = useCallback((e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
     e.preventDefault(); // Prevent default browser behavior
@@ -578,10 +601,10 @@ export const PuzzleGame: React.FC = () => {
     // Update immediately for responsive drawing
     if (svgRef.current) {
       try {
-        const rect = svgRef.current.getBoundingClientRect();
+        const rect = getCachedSVGRect();
         
         // Ensure we have valid dimensions
-        if (rect.width === 0 || rect.height === 0) {
+        if (!rect || rect.width === 0 || rect.height === 0) {
           return;
         }
         
@@ -739,6 +762,7 @@ export const PuzzleGame: React.FC = () => {
     }
   }, [
     updateThrottle,
+    getCachedSVGRect,
     currentPath, 
     occupiedCells, 
     getCellFromEvent, 
@@ -813,13 +837,14 @@ export const PuzzleGame: React.FC = () => {
     };
   }, [gameState, undoLastPath, redoLastPath]);
 
-  const getPathData = (cells: string[]) => {
+  // Memoized path data generation for better performance
+  const getPathData = useCallback((cells: string[]) => {
     if (cells.length === 0) return "";
     return cells.map((cell, i) => {
         const { x, y } = getCenterOfCell(cell);
         return (i === 0 ? 'M' : 'L') + `${x} ${y}`;
     }).join(' ');
-  };
+  }, [getCenterOfCell]);
   
   // Rule 4: Fill entire grid with one path - combine all path segments
   const allPathsData = useMemo(() => {
@@ -856,7 +881,7 @@ export const PuzzleGame: React.FC = () => {
     }
     
     return getPathData(allCells);
-  }, [paths, currentPath]);
+  }, [paths, currentPath, getPathData]);
 
   // Enhanced live cursor line for smooth pen-like drawing
   const cursorLineData = useMemo(() => {
@@ -878,6 +903,85 @@ export const PuzzleGame: React.FC = () => {
     return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
   }, [isDrawing, cursorPos, currentPath, getCenterOfCell]);
   
+  // Memoized grid lines for better performance
+  const gridLines = useMemo(() => {
+    return Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
+      <g key={i} className="text-slate-700 pointer-events-none">
+        <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
+        <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
+      </g>
+    ));
+  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
+  // Memoized dots rendering for better performance
+  const dotsElements = useMemo(() => {
+    return puzzleDots.map(({ num, row, col }) => {
+      const isConnected = occupiedCells.has(`${row},${col}`) || currentPath.includes(`${row},${col}`);
+      const isNext = num === nextDot?.num;
+      const isStart = num === 1;
+      const isEnd = num === puzzleDots.length;
+      
+      return (
+        <g key={`${puzzleId}-${num}`} transform={`translate(${col * currentComplexity.cellSize + currentComplexity.cellSize / 2}, ${row * currentComplexity.cellSize + currentComplexity.cellSize / 2})`}>
+          {/* Special styling for start and end dots */}
+          {isStart && (
+            <circle r="20" fill="none" stroke="#10b981" strokeWidth="3" opacity="0.6" />
+          )}
+          {isEnd && (
+            <circle r="20" fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.6" strokeDasharray="5,5" className={reducedAnimations ? "" : "animate-pulse"} />
+          )}
+          
+          <circle r="15" fill={isConnected ? '#0ea5e9' : '#1e293b'} className="transition-colors"/>
+          
+          {/* Pulsing indicator for next dot */}
+          {isNext && gameState !== GAME_STATE.WON && (
+            <circle r="18" fill="none" stroke="#22d3ee" strokeWidth="2" className={reducedAnimations ? "" : "animate-pulse"} />
+          )}
+          
+          {/* Extra visual indicator for the current target dot */}
+          {isNext && gameState !== GAME_STATE.WON && !isDrawing && (
+            <circle r="25" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.5" className={reducedAnimations ? "" : "animate-ping"} />
+          )}
+          
+          {/* Number with special styling for start and end */}
+          <text 
+            textAnchor="middle" 
+            dy=".3em" 
+            fill={isStart ? '#10b981' : isEnd ? '#ef4444' : 'white'} 
+            fontSize="16" 
+            fontWeight="bold"
+          >
+            {num}
+          </text>
+          
+          {/* Small indicators */}
+          {isStart && (
+            <text 
+              textAnchor="middle" 
+              dy="30" 
+              fill="#10b981" 
+              fontSize="10" 
+              fontWeight="bold"
+            >
+              START
+            </text>
+          )}
+          {isEnd && (
+            <text 
+              textAnchor="middle" 
+              dy="30" 
+              fill="#ef4444" 
+              fontSize="10" 
+              fontWeight="bold"
+            >
+              END
+            </text>
+          )}
+        </g>
+      );
+    });
+  }, [puzzleDots, occupiedCells, currentPath, nextDot, puzzleId, currentComplexity.cellSize, reducedAnimations, gameState, isDrawing]);
+
   const nextDot = puzzleDots[paths.length];
 
   // Debug logging for game state changes
@@ -1121,13 +1225,8 @@ export const PuzzleGame: React.FC = () => {
             style={{ touchAction: 'none', aspectRatio: '1/1' }}
             viewBox={`0 0 ${currentComplexity.gridSize * currentComplexity.cellSize} ${currentComplexity.gridSize * currentComplexity.cellSize}`}
           >
-            {/* Grid Lines */}
-            {Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
-              <g key={i} className="text-slate-700 pointer-events-none">
-                <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-                <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-              </g>
-            ))}
+            {/* Grid Lines - Memoized for performance */}
+            {gridLines}
 
             {/* Drawn Paths */}
             <g className="pointer-events-none">
@@ -1232,73 +1331,9 @@ export const PuzzleGame: React.FC = () => {
               )}
             </g>
             
-            {/* Dots */}
+            {/* Dots - Memoized for performance */}
             <g className="pointer-events-none">
-              {puzzleDots.map(({ num, row, col }) => {
-                const isConnected = occupiedCells.has(`${row},${col}`) || currentPath.includes(`${row},${col}`);
-                const isNext = num === nextDot?.num;
-                const isStart = num === 1;
-                const isEnd = num === puzzleDots.length;
-                
-                return (
-                  <g key={`${puzzleId}-${num}`} transform={`translate(${col * currentComplexity.cellSize + currentComplexity.cellSize / 2}, ${row * currentComplexity.cellSize + currentComplexity.cellSize / 2})`}>
-                    {/* Special styling for start and end dots */}
-                    {isStart && (
-                      <circle r="20" fill="none" stroke="#10b981" strokeWidth="3" opacity="0.6" />
-                    )}
-                    {isEnd && (
-                      <circle r="20" fill="none" stroke="#ef4444" strokeWidth="3" opacity="0.6" strokeDasharray="5,5" className={reducedAnimations ? "" : "animate-pulse"} />
-                    )}
-                    
-                    <circle r="15" fill={isConnected ? '#0ea5e9' : '#1e293b'} className="transition-colors"/>
-                    
-                    {/* Pulsing indicator for next dot */}
-                    {isNext && gameState !== GAME_STATE.WON && (
-                      <circle r="18" fill="none" stroke="#22d3ee" strokeWidth="2" className={reducedAnimations ? "" : "animate-pulse"} />
-                    )}
-                    
-                    {/* Extra visual indicator for the current target dot */}
-                    {isNext && gameState !== GAME_STATE.WON && !isDrawing && (
-                      <circle r="25" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.5" className={reducedAnimations ? "" : "animate-ping"} />
-                    )}
-                    
-                    {/* Number with special styling for start and end */}
-                    <text 
-                      textAnchor="middle" 
-                      dy=".3em" 
-                      fill={isStart ? '#10b981' : isEnd ? '#ef4444' : 'white'} 
-                      fontSize="16" 
-                      fontWeight="bold"
-                    >
-                      {num}
-                    </text>
-                    
-                    {/* Small indicators */}
-                    {isStart && (
-                      <text 
-                        textAnchor="middle" 
-                        dy="30" 
-                        fill="#10b981" 
-                        fontSize="10" 
-                        fontWeight="bold"
-                      >
-                        START
-                      </text>
-                    )}
-                    {isEnd && (
-                      <text 
-                        textAnchor="middle" 
-                        dy="30" 
-                        fill="#ef4444" 
-                        fontSize="10" 
-                        fontWeight="bold"
-                      >
-                        END
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
+              {dotsElements}
             </g>
             
             <defs>
