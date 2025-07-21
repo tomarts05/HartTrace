@@ -5,7 +5,6 @@ import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
 import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
-import { ShareButton } from './ShareButton';
 
 type Path = { from: number; to: number; cells: string[] };
 
@@ -24,12 +23,12 @@ export const PuzzleGame: React.FC = () => {
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
-  const maxPenPoints = performanceMode === 'low' ? 15 : performanceMode === 'medium' ? 25 : 40;
-  const penUpdateFrequency = performanceMode === 'low' ? 8 : performanceMode === 'medium' ? 6 : 4;
   
-  // Performance refs for throttling updates
-  const penUpdateCounterRef = useRef(0);
-  const lastPenUpdateRef = useRef(0);
+  // Performance refs for throttling updates and caching
+  const lastUpdateRef = useRef(0);
+  const updateThrottle = performanceMode === 'low' ? 100 : performanceMode === 'medium' ? 66 : 33;
+  const svgRectCacheRef = useRef<{ rect: DOMRect; timestamp: number } | null>(null);
+  const RECT_CACHE_DURATION = 100; // Cache getBoundingClientRect for 100ms
   
   // Facebook Instant Games integration
   const [fbState, fbActions] = useFBInstant();
@@ -39,25 +38,16 @@ export const PuzzleGame: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cursorPos, setCursorPos] = useState<{ x: number, y: number } | null>(null);
-  const penPathRef = useRef<{ x: number, y: number }[]>([]); // Use ref for performance
-  const [penPathUpdate, setPenPathUpdate] = useState(0); // Trigger for pen path updates
   const [timer, setTimer] = useState(0);
-  const [globalTimer, setGlobalTimer] = useState(0); // Track total progress time across all stages
-  const [complexityLevel, setComplexityLevel] = useState(0); // Always start with Stage 1 (index 0) on initial load
+  const [complexityLevel, setComplexityLevel] = useState(0);
   const [puzzleId, setPuzzleId] = useState(0); // Add unique puzzle ID to force re-renders
   
-  // Stage completion tracking for detailed progress and sharing - always start fresh
-  const [stageCompletionTimes, setStageCompletionTimes] = useState<number[]>([]);
-  const [totalGameCompletions, setTotalGameCompletions] = useState<number>(0);
-  const [bestTotalTime, setBestTotalTime] = useState<number>(Infinity);
-  const [showProgressSummary, setShowProgressSummary] = useState(false);
-  
-  // Initialize puzzle with solution (use Stage 1 complexity)
+  // Initialize puzzle with solution
   const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]));
   
   const [puzzleDots, setPuzzleDots] = useState(() => {
     console.log('Initial puzzle generation:', {
-      complexityLevel: 0, // Stage 1 complexity
+      complexityLevel: 0,
       complexity: COMPLEXITY_LEVELS[0],
       generatedDots: initialPuzzleState.dots,
       solution: initialPuzzleState.solution,
@@ -69,167 +59,140 @@ export const PuzzleGame: React.FC = () => {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [showTip, setShowTip] = useState(false);
   const [solutionPath, setSolutionPath] = useState<string[]>([]);
-  const [validatedSolution, setValidatedSolution] = useState<string[]>(initialPuzzleState.fullSolution); // Store the validated solution from puzzle generation
-  // Removed redoHistory state since Redo functionality was removed
+  const [validatedSolution, setValidatedSolution] = useState<string[]>(initialPuzzleState.solution); // Store the validated solution from puzzle generation
+  const [pathHistory, setPathHistory] = useState<Path[][]>([]); // Store history of path states for undo
+  const [redoHistory, setRedoHistory] = useState<Path[][]>([]); // Store history of path states for redo
   const svgRef = useRef<SVGSVGElement>(null);
 
   const currentComplexity = COMPLEXITY_LEVELS[complexityLevel];
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
   const occupiedCells = useMemo(() => new Set(paths.flatMap(p => p.cells)), [paths]);
 
-  // Memoize grid lines for better performance
-  const gridLines = useMemo(() => {
-    return Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
-      <g key={i} className="grid-lines">
-        <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-        <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-      </g>
-    ));
-  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
-
   useEffect(() => {
     let interval: number;
     if (gameState === GAME_STATE.PLAYING) {
       interval = window.setInterval(() => {
-        // Batch timer updates to reduce re-renders
         setTimer(prev => prev + 1);
-        setGlobalTimer(prev => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
   }, [gameState]);
 
-  // Clear localStorage data on initial load to ensure fresh start
-  useEffect(() => {
-    console.log('🔄 INITIAL LOAD: Clearing all stored progress data for fresh start...');
-    localStorage.removeItem('hartai-stage-times');
-    localStorage.removeItem('hartai-completions');
-    localStorage.removeItem('hartai-best-time');
-    console.log('✅ Initial load: All localStorage data cleared, starting fresh on Stage 1');
-  }, []); // Empty dependency array ensures this runs only on mount
-
   const resetGame = useCallback(() => {
     console.log('🔄 RESET: Generating new puzzle...');
     
-    // Generate new puzzle with current complexity
+    // Generate NEW random dots WITH validated solution
     const puzzleResult = generateRandomDotsWithSolution(currentComplexity);
+    console.log('🔄 RESET: Generated puzzle:', puzzleResult);
     
-    // Immediate state updates for smooth experience
+    // Set the state
     setPaths([]);
     setCurrentPath([]);
-    penPathRef.current = [];
     setIsDrawing(false);
     setCursorPos(null);
-    setTimer(0); // Only reset stage timer, keep global timer
+    setTimer(0);
     setGameState(GAME_STATE.IDLE);
     setShowTip(false);
     setSolutionPath([]);
-    setValidatedSolution(puzzleResult.fullSolution);
-    // Removed setRedoHistory call since redo functionality was removed
-    setPuzzleDots(puzzleResult.dots);
-    setPuzzleId(prev => prev + 1);
+    setValidatedSolution(puzzleResult.solution); // Store the EXACT validated solution
+    setPathHistory([]); // Clear undo history
+    setRedoHistory([]); // Clear redo history
+    setPuzzleDots(puzzleResult.dots); // Use the validated dots
+    setPuzzleId(prev => prev + 1); // Force re-render with new puzzle ID
     
-    console.log('✅ INSTANT reset complete for Stage', complexityLevel + 1, 'with unique pattern');
-  }, [currentComplexity, complexityLevel]);
+    console.log('🔄 RESET: State updated with new dots');
+  }, [currentComplexity]);
 
   const showNotification = useCallback((message: string, type: 'success' | 'info' = 'success') => {
-    // Use requestAnimationFrame for smoother notification updates
-    requestAnimationFrame(() => {
-      setNotification({ message, type });
-      setTimeout(() => setNotification(null), 3000); // Auto-hide after 3 seconds
-    });
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000); // Auto-hide after 3 seconds
   }, []);
 
-
-
-  // Removed clearStoredProgress function since Clear Records button was removed
-
-  const resetAllProgress = useCallback(() => {
-    console.log('🔄 RESET ALL: Going back to Stage 1 and clearing ALL stored progress...');
-    
-    // Clear ALL localStorage data for fresh start
-    localStorage.removeItem('hartai-stage-times');
-    localStorage.removeItem('hartai-completions');
-    localStorage.removeItem('hartai-best-time');
-    console.log('🗑️ Cleared all stored progress data from localStorage');
-    
-    // Reset to first complexity level (Stage 1)
-    const firstComplexity = COMPLEXITY_LEVELS[0]; // Start from Easy (Stage 1)
-    const puzzleResult = generateRandomDotsWithSolution(firstComplexity);
-    
-    // Use requestAnimationFrame for smoother reset
-    requestAnimationFrame(() => {
-      // Batch all state updates including level reset
-      setComplexityLevel(0); // Reset to Stage 1 (Easy)
-      setPaths([]);
-      setCurrentPath([]);
-      penPathRef.current = [];
-      setIsDrawing(false);
-      setCursorPos(null);
-      setTimer(0); // Reset stage timer
-      setGlobalTimer(0); // Reset global progress timer
-      setGameState(GAME_STATE.IDLE);
-      setShowTip(false);
-      setSolutionPath([]);
-      setValidatedSolution(puzzleResult.fullSolution);
-      setPuzzleDots(puzzleResult.dots);
-      setPuzzleId(prev => prev + 1);
-      
-      // Reset all progress tracking state to initial values
-      setStageCompletionTimes([]);
-      setTotalGameCompletions(0);
-      setBestTotalTime(Infinity);
-      setShowProgressSummary(false);
-      
-      showNotification('🔄 Reset to Stage 1! ALL progress data cleared completely.', 'info');
-      console.log('✅ Complete reset: Stage 1, all timers cleared, all localStorage cleared');
-    });
-  }, [showNotification]);
-
   // Save current state to history (called before making changes)
-  // Removed - now using simpler path-by-path undo system
+  const saveToHistory = useCallback(() => {
+    setPathHistory(prev => [...prev, [...paths]]);
+    setRedoHistory([]); // Clear redo history when new action is taken
+    console.log('Saved state to history. Paths count:', paths.length);
+  }, [paths]);
 
   const undoLastPath = useCallback(() => {
-    if (paths.length === 0 && currentPath.length === 0) {
+    if (pathHistory.length === 0) {
       showNotification('Nothing to undo!', 'info');
       return;
     }
 
-    console.log('Undoing last connection. Current paths:', paths.length, 'Current path:', currentPath.length);
+    console.log('Undoing. History length:', pathHistory.length, 'Current paths:', paths.length);
 
-    // If we're currently drawing (have a current path), just clear it
-    if (currentPath.length > 0) {
-      console.log('🔙 Undoing current drawing path');
-      setCurrentPath([]);
-      penPathRef.current = [];
-      setIsDrawing(false);
-      setCursorPos(null);
-      showNotification(`🔙 Cleared current drawing`, 'info');
+    // Get the previous state
+    const previousState = pathHistory[pathHistory.length - 1];
+    
+    // Save current state to redo history
+    setRedoHistory(prev => [...prev, [...paths]]);
+    
+    // Remove last item from undo history
+    setPathHistory(prev => prev.slice(0, -1));
+    
+    // Restore previous state
+    setPaths(previousState);
+    
+    // Clear current drawing path
+    setCurrentPath([]);
+    setIsDrawing(false);
+    setCursorPos(null);
+    
+    // Show notification
+    showNotification(`🔙 Undid last action`, 'info');
+    
+    console.log('Undid path. Restored to paths count:', previousState.length);
+  }, [pathHistory, paths, showNotification]);
+
+  const redoLastPath = useCallback(() => {
+    if (redoHistory.length === 0) {
+      showNotification('Nothing to redo!', 'info');
       return;
     }
 
-    // If we have completed paths, undo the last one
-    if (paths.length > 0) {
-      const lastPath = paths[paths.length - 1];
-      console.log(`🔙 Undoing path from dot ${lastPath.from} to dot ${lastPath.to}`);
-      
-      // Remove the last path
-      setPaths(prev => prev.slice(0, -1));
-      
-      // Clear any current drawing state
-      setCurrentPath([]);
-      penPathRef.current = [];
-      setIsDrawing(false);
-      setCursorPos(null);
-      
-      // Show notification with specific path info
-      showNotification(`🔙 Undid connection ${lastPath.from} → ${lastPath.to}`, 'info');
-      
-      console.log('Undid last path. New paths count:', paths.length - 1);
-    }
-  }, [paths, currentPath, showNotification]);
+    console.log('Redoing. Redo history length:', redoHistory.length, 'Current paths:', paths.length);
 
-  // Removed redoLastPath function since Redo button was removed
+    // Get the next state
+    const nextState = redoHistory[redoHistory.length - 1];
+    
+    // Save current state to undo history
+    setPathHistory(prev => [...prev, [...paths]]);
+    
+    // Remove last item from redo history
+    setRedoHistory(prev => prev.slice(0, -1));
+    
+    // Restore next state
+    setPaths(nextState);
+    
+    // Clear current drawing path
+    setCurrentPath([]);
+    setIsDrawing(false);
+    setCursorPos(null);
+    
+    showNotification(`🔄 Redid last action`, 'info');
+    
+    console.log('Redid path. Restored to paths count:', nextState.length);
+  }, [redoHistory, paths, showNotification]);
+
+  // Helper function to find the next dot in the solution path
+  const findNextDotInSolution = useCallback((solution: string[], currentIndex: number, dots: any[]) => {
+    // Create a map of dot positions
+    const dotPositions = new Set<string>();
+    dots.forEach(dot => {
+      dotPositions.add(`${dot.row},${dot.col}`);
+    });
+    
+    // Find the next cell in the solution that contains a dot
+    for (let i = currentIndex + 1; i < solution.length; i++) {
+      if (dotPositions.has(solution[i])) {
+        return i;
+      }
+    }
+    
+    return -1; // No more dots found
+  }, []);
 
   const showTipHandler = useCallback(() => {
     if (gameState === GAME_STATE.WON) return;
@@ -269,13 +232,34 @@ export const PuzzleGame: React.FC = () => {
     
     console.log('Already filled cells count:', filledCells.size);
     
-    // Show only a SMALL HINT instead of complete solution
+    // Find where we are in the solution and show meaningful segments
     let tipPath: string[] = [];
+    let startIndex = 0;
     
     if (filledCells.size === 0) {
-      // No progress yet - show only the first 3-4 moves as a hint
-      tipPath = fullSolution.slice(0, 4);
-      console.log('🔰 No progress - showing small hint:', tipPath.length, 'cells');
+      // No progress yet - show from start to first or second dot
+      const firstDot = puzzleDots.find(dot => dot.num === 1);
+      const secondDot = puzzleDots.find(dot => dot.num === 2);
+      
+      if (firstDot && secondDot) {
+        const firstDotCell = `${firstDot.row},${firstDot.col}`;
+        const secondDotCell = `${secondDot.row},${secondDot.col}`;
+        const firstDotIndex = fullSolution.indexOf(firstDotCell);
+        const secondDotIndex = fullSolution.indexOf(secondDotCell);
+        
+        if (firstDotIndex >= 0 && secondDotIndex > firstDotIndex) {
+          // Show path to second dot plus some more
+          const endIndex = Math.min(secondDotIndex + 8, fullSolution.length);
+          tipPath = fullSolution.slice(0, endIndex);
+          console.log('🔰 No progress - showing path to second dot + more:', tipPath.length, 'cells');
+        }
+      }
+      
+      if (tipPath.length === 0) {
+        // Fallback: show first 15-20 steps
+        tipPath = fullSolution.slice(0, Math.min(20, fullSolution.length));
+        console.log('🔰 No progress - showing first steps:', tipPath.length, 'cells');
+      }
     } else {
       // Find the furthest point in the solution that matches our progress
       let lastMatchIndex = -1;
@@ -286,16 +270,35 @@ export const PuzzleGame: React.FC = () => {
       }
       
       if (lastMatchIndex >= 0) {
-        console.log('� Found progress up to solution index:', lastMatchIndex);
+        console.log('📍 Found progress up to solution index:', lastMatchIndex);
         
-        // Show the COMPLETE remaining path from current position to the end
-        const startIndex = lastMatchIndex + 1;
-        tipPath = fullSolution.slice(startIndex, startIndex + Math.min(5, fullSolution.length - startIndex)); // Show small hint only
-        console.log(`� Showing path continuation:`, tipPath.length, 'cells');
+        // Find the next dot we need to reach
+        const nextDotIndex = findNextDotInSolution(fullSolution, lastMatchIndex, puzzleDots);
+        
+        if (nextDotIndex >= 0) {
+          // Show path from current position to next dot plus more steps beyond
+          startIndex = lastMatchIndex + 1;
+          const endIndex = Math.min(nextDotIndex + 15, fullSolution.length);
+          tipPath = fullSolution.slice(startIndex, endIndex);
+          console.log(`📍 Showing path from index ${startIndex} to next dot + more:`, tipPath.length, 'cells');
+        } else {
+          // No more dots - show remaining path for completion
+          startIndex = lastMatchIndex + 1;
+          const endIndex = Math.min(startIndex + 25, fullSolution.length);
+          tipPath = fullSolution.slice(startIndex, endIndex);
+          console.log(`📍 Showing final completion path:`, tipPath.length, 'cells');
+        }
       } else {
-        // Current path doesn't match solution - show small hint from start
-        tipPath = fullSolution.slice(0, 4);
-        console.log('⚠️ Path mismatch - showing small hint from start:', tipPath.length, 'cells');
+        // Current path doesn't match solution - show corrective guidance
+        const firstDot = puzzleDots.find(dot => dot.num === 1);
+        if (firstDot) {
+          const firstDotCell = `${firstDot.row},${firstDot.col}`;
+          const firstDotIndex = fullSolution.indexOf(firstDotCell);
+          if (firstDotIndex >= 0) {
+            tipPath = fullSolution.slice(0, Math.min(firstDotIndex + 12, fullSolution.length));
+            console.log('⚠️ Path mismatch - showing correct path:', tipPath.length, 'cells');
+          }
+        }
       }
     }
     
@@ -310,15 +313,15 @@ export const PuzzleGame: React.FC = () => {
     setShowTip(true);
     
     // Create a more informative tip message
-    let tipMessage = '💡 Tip: Follow the yellow hint path!';
+    let tipMessage = '💡 Tip: Follow the yellow path!';
     if (filledCells.size === 0) {
-      tipMessage = `💡 Tip: Start from dot 1 and follow the yellow hint for your next few moves!`;
+      tipMessage = `💡 Tip: Start from dot 1 and follow the yellow path to dot 2!`;
     } else {
       const nextDotNum = paths.length + 2; // Next dot we need to reach
       if (nextDotNum <= puzzleDots.length) {
-        tipMessage = `💡 Tip: Follow the yellow hint to get closer to dot ${nextDotNum}!`;
+        tipMessage = `💡 Tip: Follow the yellow path to reach dot ${nextDotNum}!`;
       } else {
-        tipMessage = `💡 Tip: Follow the yellow hint for your next moves!`;
+        tipMessage = `💡 Tip: Follow the yellow path to complete the puzzle!`;
       }
     }
     
@@ -334,91 +337,107 @@ export const PuzzleGame: React.FC = () => {
       setShowTip(false);
       setSolutionPath([]);
     }, 15000);
-  }, [gameState, validatedSolution, paths, currentPath, fbActions, complexityLevel, showNotification, puzzleDots, currentComplexity]);
+  }, [gameState, validatedSolution, paths, currentPath, fbActions, complexityLevel, showNotification, puzzleDots, findNextDotInSolution, currentComplexity]);
 
   const advanceToNextLevel = useCallback(() => {
     const nextLevel = Math.min(complexityLevel + 1, COMPLEXITY_LEVELS.length - 1);
     const newComplexity = COMPLEXITY_LEVELS[nextLevel];
     
-    console.log('🚀 ADVANCE: From Stage', complexityLevel + 1, 'to Stage', nextLevel + 1);
-    console.log('🎯 NEW COMPLEXITY:', newComplexity);
+    console.log('Advancing from level', complexityLevel, 'to level', nextLevel);
+    console.log('Current stage:', complexityLevel + 1, 'Next stage:', nextLevel + 1);
     
-    // Show notification briefly
+    // Show notification with a brief delay before advancing
     showNotification(`🎉 Stage ${complexityLevel + 1} Complete! Moving to Stage ${nextLevel + 1}`, 'success');
     
-    // For high complexity levels, use optimized generation
-    if (newComplexity.gridSize >= 7) {
-      console.log('⚡ HIGH COMPLEXITY: Using INSTANT generation (no delays)');
+    setTimeout(() => {
+      console.log('Setting complexity level to:', nextLevel);
+      console.log('Setting stage number to:', nextLevel + 1);
       
-      // INSTANT generation for Stage 11 & 12 - no setTimeout delays
-      try {
-        console.log('🚀 INSTANT puzzle generation:', newComplexity);
-        const puzzleResult = generateRandomDotsWithSolution(newComplexity);
-        
-        // Immediate state updates - no async delays
-        setComplexityLevel(nextLevel);
-        setPuzzleDots(puzzleResult.dots);
-        setValidatedSolution(puzzleResult.fullSolution);
-        setPuzzleId(prev => prev + 1);
-        setPaths([]);
-        setCurrentPath([]);
-        penPathRef.current = [];
-        setIsDrawing(false);
-        setCursorPos(null);
-        setTimer(0); // Reset stage timer, but keep global timer running
-        setGameState(GAME_STATE.IDLE);
-        setShowTip(false);
-        setSolutionPath([]);
-        
-        console.log('✅ INSTANT ADVANCE to Stage', nextLevel + 1, 'complete!');
-        
-        if (nextLevel + 1 === 12) {
-          showNotification(`🏆 Welcome to Master Stage 12!`, 'success');
-        } else {
-          showNotification(`⚡ Welcome to Stage ${nextLevel + 1}!`, 'success');
-        }
-      } catch (error) {
-        console.error('❌ INSTANT GENERATION ERROR:', error);
-        showNotification(`⚠️ Error generating Stage ${nextLevel + 1}. Please try again.`, 'info');
-      }
-    } else {
-      // For simpler puzzles, use immediate generation
-      requestAnimationFrame(() => {
-        try {
-          console.log('🎲 Generating simple puzzle:', newComplexity);
-          const puzzleResult = generateRandomDotsWithSolution(newComplexity);
-          
-          // Batch all state updates for better performance
-          setComplexityLevel(nextLevel);
-          setPuzzleDots(puzzleResult.dots);
-          setValidatedSolution(puzzleResult.fullSolution);
-          setPuzzleId(prev => prev + 1);
-          setPaths([]);
-          setCurrentPath([]);
-          penPathRef.current = [];
-          setIsDrawing(false);
-          setCursorPos(null);
-          setTimer(0); // Reset stage timer, but keep global timer running
-          setGameState(GAME_STATE.IDLE);
-          setShowTip(false);
-          setSolutionPath([]);
-          
-          console.log('✅ ADVANCED TO STAGE', nextLevel + 1, 'successfully');
-        } catch (error) {
-          console.error('❌ PUZZLE GENERATION ERROR:', error);
-          showNotification(`⚠️ Error generating Stage ${nextLevel + 1}. Please try again.`, 'info');
-        }
+      setComplexityLevel(nextLevel);
+      const puzzleResult = generateRandomDotsWithSolution(newComplexity);
+      console.log('Generated new puzzle for level', nextLevel, ':', {
+        complexity: newComplexity,
+        generatedDots: puzzleResult.dots,
+        solution: puzzleResult.solution,
+        expectedDots: newComplexity.numDots,
+        actualDots: puzzleResult.dots.length
       });
-    }
+      setPuzzleDots(puzzleResult.dots);
+      setValidatedSolution(puzzleResult.solution); // Store the validated solution
+      setPuzzleId(prev => prev + 1); // Force re-render with new puzzle ID
+      
+      // Reset game state manually since resetGame depends on currentComplexity
+      setPaths([]);
+      setCurrentPath([]);
+      setIsDrawing(false);
+      setCursorPos(null);
+      setTimer(0);
+      setGameState(GAME_STATE.IDLE);
+      setShowTip(false);
+      setSolutionPath([]);
+      setPathHistory([]); // Clear undo history
+      
+      console.log('Advanced to next level successfully');
+    }, 1000); // 1 second delay to show notification
   }, [complexityLevel, showNotification]);
 
-  // Removed startNewGame function since New button was removed
+  const startNewGame = useCallback(() => {
+    console.log('🎲 NEW GAME: Starting for level', complexityLevel);
+    
+    fbActions.logEvent('new_game_started', 1, { stage: complexityLevel + 1 });
+    
+    // Generate NEW random dots WITH validated solution
+    const puzzleResult = generateRandomDotsWithSolution(currentComplexity);
+    console.log('🎲 NEW GAME: Generated puzzle:', puzzleResult);
+    console.log('🎲 NEW GAME: Dot positions:', puzzleResult.dots.map(d => `${d.num}: (${d.row},${d.col})`));
+    console.log('🎲 NEW GAME: Solution length:', puzzleResult.solution.length);
+    
+    // Set the puzzle dots FIRST, then reset the game
+    setPuzzleDots(puzzleResult.dots);
+    setValidatedSolution(puzzleResult.solution); // Store the validated solution
+    setPuzzleId(prev => prev + 1); // Force re-render with new puzzle ID
+    
+    // Clear all game state
+    setPaths([]);
+    setCurrentPath([]);
+    setIsDrawing(false);
+    setCursorPos(null);
+    setTimer(0);
+    setGameState(GAME_STATE.IDLE);
+    setShowTip(false);
+    setSolutionPath([]);
+    setPathHistory([]);
+    setRedoHistory([]);
+    
+    showNotification(`🎲 New Stage ${complexityLevel + 1} puzzle generated!`, 'info');
+    console.log('🎲 NEW GAME: Complete!');
+  }, [currentComplexity, complexityLevel, showNotification, fbActions]);
+
+  // Optimized coordinate calculation with caching
+  const getCachedSVGRect = useCallback(() => {
+    if (!svgRef.current) return null;
+    
+    const now = performance.now();
+    const cache = svgRectCacheRef.current;
+    
+    // Use cached rect if it's fresh (within RECT_CACHE_DURATION)
+    if (cache && (now - cache.timestamp) < RECT_CACHE_DURATION) {
+      return cache.rect;
+    }
+    
+    // Get fresh rect and cache it
+    const rect = svgRef.current.getBoundingClientRect();
+    svgRectCacheRef.current = { rect, timestamp: now };
+    return rect;
+  }, []);
 
   const getCellFromEvent = useCallback((e: PointEvent): string | null => {
     if (!svgRef.current) return null;
     
     try {
-      const rect = svgRef.current.getBoundingClientRect();
+      const rect = getCachedSVGRect();
+      if (!rect) return null;
+      
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       
@@ -444,15 +463,16 @@ export const PuzzleGame: React.FC = () => {
       console.warn('Error getting cell from event:', error);
       return null;
     }
-  }, [currentComplexity]);
+  }, [currentComplexity, getCachedSVGRect]);
 
-  const getCenterOfCell = (cell: string): { x: number, y: number } => {
+  // Memoized cell center calculation for better performance
+  const getCenterOfCell = useCallback((cell: string): { x: number, y: number } => {
     const [row, col] = cell.split(',').map(Number);
     return {
       x: col * currentComplexity.cellSize + currentComplexity.cellSize / 2,
       y: row * currentComplexity.cellSize + currentComplexity.cellSize / 2,
     };
-  };
+  }, [currentComplexity.cellSize]);
 
   const handleInteractionStart = useCallback((e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
     e.preventDefault(); // Prevent default browser behavior
@@ -490,26 +510,6 @@ export const PuzzleGame: React.FC = () => {
           console.log('Cleared tip on drawing start');
         }
         setIsDrawing(true);
-        
-        // Set initial cursor position for immediate feedback
-        if (svgRef.current) {
-          try {
-            const rect = svgRef.current.getBoundingClientRect();
-            const x = point.clientX - rect.left;
-            const y = point.clientY - rect.top;
-            
-            const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
-            const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
-            
-            const svgX = (x / rect.width) * svgWidth;
-            const svgY = (y / rect.height) * svgHeight;
-            
-            setCursorPos({ x: svgX, y: svgY });
-            console.log('🎯 Initial cursor position set:', { svgX, svgY });
-          } catch (error) {
-            console.warn('Error setting initial cursor position:', error);
-          }
-        }
         return;
       }
       
@@ -533,26 +533,6 @@ export const PuzzleGame: React.FC = () => {
         }
         setIsDrawing(true);
         setCurrentPath(prev => [...prev, cell]);
-        
-        // Set initial cursor position
-        if (svgRef.current) {
-          try {
-            const rect = svgRef.current.getBoundingClientRect();
-            const x = point.clientX - rect.left;
-            const y = point.clientY - rect.top;
-            
-            const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
-            const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
-            
-            const svgX = (x / rect.width) * svgWidth;
-            const svgY = (y / rect.height) * svgHeight;
-            
-            setCursorPos({ x: svgX, y: svgY });
-            console.log('🎯 Initial cursor position set:', { svgX, svgY });
-          } catch (error) {
-            console.warn('Error setting initial cursor position:', error);
-          }
-        }
         return;
       }
     }
@@ -566,11 +546,11 @@ export const PuzzleGame: React.FC = () => {
         setSolutionPath([]);
         console.log('Cleared tip on new path start');
       }
+      // Clear redo history when starting a new action
+      setRedoHistory([]);
       
       // Immediately set up drawing state for better responsiveness
       setCurrentPath([startDotCell]); // Always start with the dot cell
-      const dotCenter = getCenterOfCell(startDotCell);
-      penPathRef.current = [dotCenter]; // Start pen path from dot center
       setIsDrawing(true);
       
       // DEBUG: Log drawing start
@@ -596,76 +576,35 @@ export const PuzzleGame: React.FC = () => {
         }
       }
     } else {
-      // TOLERANCE FIX: Check if click is close to the start dot (within 1 cell tolerance)
-      // This handles coordinate precision issues and improves user experience
-      const [startRow, startCol] = startDotCell.split(',').map(Number);
-      const [clickRow, clickCol] = cell.split(',').map(Number);
-      const rowDiff = Math.abs(startRow - clickRow);
-      const colDiff = Math.abs(startCol - clickCol);
-      
-      // Allow clicking within 2 cells of the target dot as a tolerance for better UX
-      if (rowDiff <= 2 && colDiff <= 2) {
-        console.log('🎯 TOLERANCE MATCH: Click close enough to dot', nextDotNumber, 'expected', startDotCell, 'got', cell);
-        
-        // Use the actual dot position instead of clicked position
-        setCurrentPath([startDotCell]);
-        const dotCenter = getCenterOfCell(startDotCell);
-        penPathRef.current = [dotCenter];
-        setIsDrawing(true);
-        
-        console.log('🎯 Drawing STARTED with tolerance from dot', nextDotNumber, 'at cell', startDotCell);
-        
-        if (svgRef.current) {
-          try {
-            const rect = svgRef.current.getBoundingClientRect();
-            const x = point.clientX - rect.left;
-            const y = point.clientY - rect.top;
-            
-            const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
-            const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
-            
-            const svgX = (x / rect.width) * svgWidth;
-            const svgY = (y / rect.height) * svgHeight;
-            
-            setCursorPos({ x: svgX, y: svgY });
-          } catch (error) {
-            console.warn('Error setting initial cursor position:', error);
-          }
-        }
-        return;
-      }
-      
-      // Check if user clicked on any numbered dot (but wrong one)
-      const clickedDot = puzzleDots.find(d => cell === `${d.row},${d.col}`);
-      if (clickedDot) {
-        console.log(`❌ WRONG START DOT: Clicked dot ${clickedDot.num} but must start from dot ${nextDotNumber}`);
-        showNotification(`Must connect dots in order! Start from dot ${nextDotNumber}, not dot ${clickedDot.num}`, 'info');
-      } else {
-        console.log('Must start from dot', nextDotNumber, 'at cell', startDotCell);
-        showNotification(`Start from dot ${nextDotNumber} or continue your current path`, 'info');
-      }
+      console.log('Must start from dot', nextDotNumber, 'at cell', startDotCell);
+      showNotification(`Start from dot ${nextDotNumber} or continue your current path`, 'info');
     }
-  }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showTip, showNotification, currentPath, currentComplexity]);
-
+  }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showTip, showNotification, currentPath]);
+  
   const handleInteractionMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDrawing) return;
     
-    // Prevent default behavior only for non-passive events (mouse events)
-    // Touch events are registered as passive for performance, so they can't preventDefault
-    if (e.cancelable && e.type === 'mousemove') {
+    // Throttle updates for better performance on mobile devices
+    const now = performance.now();
+    if (now - lastUpdateRef.current < updateThrottle) return;
+    lastUpdateRef.current = now;
+    
+    // Only prevent default for mouse events, not touch events
+    if (e.type === 'mousemove' && e.cancelable) {
       e.preventDefault();
     }
 
     const point = 'touches' in e ? e.touches[0] : e;
     if (!point) return;
 
-    // PEN-LIKE DRAWING: Always update cursor position for smooth, continuous drawing
+    // CONTINUOUS DRAWING: Always update cursor position for smooth pen-like drawing
+    // Update immediately for responsive drawing
     if (svgRef.current) {
       try {
-        const rect = svgRef.current.getBoundingClientRect();
+        const rect = getCachedSVGRect();
         
         // Ensure we have valid dimensions
-        if (rect.width === 0 || rect.height === 0) {
+        if (!rect || rect.width === 0 || rect.height === 0) {
           return;
         }
         
@@ -685,37 +624,15 @@ export const PuzzleGame: React.FC = () => {
           return;
         }
         
-        // Update cursor position with throttling for mobile performance
-        const now = performance.now();
-        const shouldUpdateCursor = performanceMode === 'low' ? (now - lastPenUpdateRef.current >= 33) : true;
-        
-        if (shouldUpdateCursor) {
-          setCursorPos({ x: svgX, y: svgY });
-        }
-        
-        // Add point to pen path for smooth curve drawing (use ref for performance)
-        penPathRef.current.push({ x: svgX, y: svgY });
-        
-        // Keep only last N points for performance (optimized based on device capability)
-        if (penPathRef.current.length > maxPenPoints) {
-          penPathRef.current = penPathRef.current.slice(-maxPenPoints);
-        }
-        
-        // Throttle pen path updates for better performance
-        penUpdateCounterRef.current++;
-        
-        // Update pen path visualization based on time-based throttling for smoother performance
-        if (now - lastPenUpdateRef.current >= (performanceMode === 'low' ? 50 : performanceMode === 'medium' ? 33 : 16)) {
-          lastPenUpdateRef.current = now;
-          setPenPathUpdate(prev => prev + 1);
-        }
+        // IMMEDIATELY update cursor position for continuous line drawing
+        setCursorPos({ x: svgX, y: svgY });
       } catch (error) {
         console.warn('Error setting cursor position:', error);
-        return;
+        return; // Exit early if coordinate calculation fails
       }
     }
     
-    // CELL VALIDATION: Handle game logic updates when entering new valid cells
+    // SEPARATE LOGIC: Handle cell-based path updates only when entering new valid cells
     if (currentPath.length === 0) return; // Need at least starting cell
     
     const cell = getCellFromEvent(point);
@@ -736,7 +653,7 @@ export const PuzzleGame: React.FC = () => {
     const isAdjacent = isHorizontal || isVertical;
 
     if (!isAdjacent) {
-      return; // Don't add non-adjacent cells, but continue showing smooth cursor line
+      return; // Don't add non-adjacent cells, but continue showing cursor line
     }
 
     // Rule 5: Path cannot cross itself
@@ -750,25 +667,6 @@ export const PuzzleGame: React.FC = () => {
       return;
     }
 
-    // EARLY ORDER VALIDATION: Prevent approaching wrong numbered dots
-    const dotAtTargetCell = puzzleDots.find(d => cell === `${d.row},${d.col}`);
-    
-    if (dotAtTargetCell) {
-      const currentDotNum = paths.length + 1;
-      const nextDotNum = currentDotNum + 1;
-      
-      if (dotAtTargetCell.num !== nextDotNum) {
-        console.log(`❌ BLOCKED APPROACH: Cannot approach dot ${dotAtTargetCell.num}, must reach dot ${nextDotNum} first`);
-        showNotification(`Must connect dots in order! Next dot should be ${nextDotNum}`, 'info');
-        
-        // STOP drawing immediately when trying to approach wrong dot
-        setIsDrawing(false);
-        setCursorPos(null);
-        penPathRef.current = [];
-        return;
-      }
-    }
-
     // Add the cell to the current path
     const newCurrentPath = [...currentPath, cell];
     setCurrentPath(newCurrentPath);
@@ -777,61 +675,24 @@ export const PuzzleGame: React.FC = () => {
     if (showTip || solutionPath.length > 0) {
       setShowTip(false);
       setSolutionPath([]);
-      console.log('Cleared tip on path progress');
     }
 
     // Check if we've reached a numbered dot (Rule 3: Visit numbered cells in ascending order)
     const currentDotNum = paths.length + 1;
     const nextDotNum = currentDotNum + 1;
+    const nextDot = puzzleDots.find(d => d.num === nextDotNum);
     
-    // STRICT ORDER ENFORCEMENT: Only allow connecting to the NEXT dot in sequence
-    // Check if we're on ANY dot cell first
-    const dotAtCell = puzzleDots.find(d => cell === `${d.row},${d.col}`);
-    
-    if (dotAtCell) {
-      // STRICT ORDER ENFORCEMENT: If we're on a dot cell, it MUST be the next dot in sequence
-      if (dotAtCell.num !== nextDotNum) {
-        console.log(`❌ WRONG ORDER: Reached dot ${dotAtCell.num} but expected dot ${nextDotNum}`);
-        showNotification(`Must connect dots in order! Next dot should be ${nextDotNum}`, 'info');
-        
-        // STOP drawing immediately when wrong order is detected
-        setIsDrawing(false);
-        setCursorPos(null);
-        penPathRef.current = [];
-        return; // Block the connection completely
-      }
+    // If we're on a dot cell and it's the next dot in sequence
+    if (nextDot && cell === `${nextDot.row},${nextDot.col}`) {
+      console.log(`Reached dot ${nextDotNum} at cell ${cell}`);
       
-      console.log(`✅ VALID CONNECTION: Reached correct dot ${nextDotNum} at cell ${cell}`);
+      // Save current state to history before adding new path
+      saveToHistory();
       
       // Complete the current path to this dot
       const newPath: Path = { from: currentDotNum, to: nextDotNum, cells: [...newCurrentPath] };
       const newPaths = [...paths, newPath];
-      
-      // Batch all state updates together to prevent visual flicker
-      React.startTransition(() => {
-        setPaths(newPaths);
-        
-        // Continue drawing from this dot if there are more dots
-        if (nextDotNum < puzzleDots.length) {
-          // Rule 3: Visit numbered cells in ascending order
-          // Continue the path from this dot to maintain visual continuity
-          console.log('Continuing to draw from dot', nextDotNum, 'at cell', cell);
-          setCurrentPath([cell]); // Start next segment from this dot
-        } else {
-          console.log('All dots connected! Finishing drawing.');
-          setCurrentPath([]);
-          setIsDrawing(false);
-          setCursorPos(null);
-        }
-      });
-      
-      // Handle ref updates outside of React.startTransition to maintain performance
-      if (nextDotNum < puzzleDots.length) {
-        const dotCenter = getCenterOfCell(cell);
-        penPathRef.current = [dotCenter]; // Reset pen path from new dot center
-      } else {
-        penPathRef.current = [];
-      }
+      setPaths(newPaths);
       
       // Check if this was the last dot AND if all cells are filled
       const isLastDot = nextDotNum === puzzleDots.length;
@@ -851,52 +712,12 @@ export const PuzzleGame: React.FC = () => {
       if (isLastDot && allCellsFilled) {
         console.log('🎉 WIN CONDITION TRIGGERED! All README.md rules satisfied');
         
-        // Track stage completion with detailed timing
-        const currentStageTime = timer;
-        const newStageCompletionTimes = [...stageCompletionTimes];
-        newStageCompletionTimes[complexityLevel] = currentStageTime;
-        setStageCompletionTimes(newStageCompletionTimes);
-        localStorage.setItem('hartai-stage-times', JSON.stringify(newStageCompletionTimes));
-        
-        console.log('📊 STAGE TRACKING:', {
-          stage: complexityLevel + 1,
-          stageTime: currentStageTime,
-          globalTime: globalTimer,
-          completedStages: newStageCompletionTimes.length
-        });
-        
-        // Check if this completes the entire game (Stage 12)
-        const isGameComplete = complexityLevel === COMPLEXITY_LEVELS.length - 1; // Stage 12 (index 11)
-        
-        if (isGameComplete) {
-          // Track full game completion
-          const newCompletions = totalGameCompletions + 1;
-          setTotalGameCompletions(newCompletions);
-          localStorage.setItem('hartai-completions', newCompletions.toString());
-          
-          // Update best time if this is better
-          if (globalTimer < bestTotalTime) {
-            setBestTotalTime(globalTimer);
-            localStorage.setItem('hartai-best-time', globalTimer.toString());
-            console.log('🏆 NEW BEST TIME:', globalTimer, 'seconds');
-          }
-          
-          console.log('🎊 GAME COMPLETION TRACKED:', {
-            totalCompletions: newCompletions,
-            totalTime: globalTimer,
-            bestTime: Math.min(globalTimer, bestTotalTime),
-            allStageTimes: newStageCompletionTimes
-          });
-        }
-        
         // Log completion event to Facebook
         fbActions.logEvent('stage_completed', complexityLevel + 1, {
           stage: complexityLevel + 1,
           time: timer,
           paths: newPaths.length,
-          complexity: currentComplexity.description,
-          globalTime: globalTimer,
-          isGameComplete
+          complexity: currentComplexity.description
         });
         
         // Submit score to leaderboard if in Facebook
@@ -912,12 +733,24 @@ export const PuzzleGame: React.FC = () => {
         showNotification(`🎉 Puzzle Solved! Stage ${complexityLevel + 1} Complete!`, 'success');
         setGameState(GAME_STATE.WON);
         setCurrentPath([]);
-        penPathRef.current = [];
         setIsDrawing(false);
         setCursorPos(null);
         return;
-    }
-
+      }
+      
+      // Continue drawing from this dot if there are more dots
+      if (nextDotNum < puzzleDots.length) {
+        // Rule 3: Visit numbered cells in ascending order
+        // Continue the path from this dot to maintain visual continuity
+        console.log('Continuing to draw from dot', nextDotNum, 'at cell', cell);
+        setCurrentPath([cell]); // Start next segment from this dot
+      } else {
+        console.log('All dots connected! Finishing drawing.');
+        setCurrentPath([]);
+        setIsDrawing(false);
+        setCursorPos(null);
+      }
+      return;
     }
 
     // Handle backtracking (moving back one cell) - more reliable logic
@@ -928,6 +761,8 @@ export const PuzzleGame: React.FC = () => {
       return;
     }
   }, [
+    updateThrottle,
+    getCachedSVGRect,
     currentPath, 
     occupiedCells, 
     getCellFromEvent, 
@@ -936,6 +771,7 @@ export const PuzzleGame: React.FC = () => {
     showTip, 
     setSolutionPath, 
     setShowTip, 
+    saveToHistory, 
     currentComplexity,
     totalCells,
     fbActions,
@@ -948,8 +784,7 @@ export const PuzzleGame: React.FC = () => {
     setIsDrawing,
     setCursorPos,
     setPaths,
-    solutionPath,
-    isDrawing
+    solutionPath
   ]);
 
   const handleInteractionEnd = useCallback(() => {
@@ -959,14 +794,15 @@ export const PuzzleGame: React.FC = () => {
     setCursorPos(null);
     
     // Keep the current path for visual continuity and to allow continuing later
-    // Clear pen path to start fresh for next drawing session
-    penPathRef.current = [];
-    console.log('Drawing ended, keeping current path for continuity, cleared pen path');
+    // Don't clear currentPath - this maintains the partial path on screen
+    console.log('Drawing ended, keeping current path for continuity');
   }, [isDrawing]);
 
   useEffect(() => {
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('touchmove', handleInteractionMove, { passive: true });
+    // Use passive events for better scroll performance on mobile
+    const options = { passive: true };
+    window.addEventListener('mousemove', handleInteractionMove, options);
+    window.addEventListener('touchmove', handleInteractionMove, options);
     window.addEventListener('mouseup', handleInteractionEnd);
     window.addEventListener('touchend', handleInteractionEnd);
     return () => {
@@ -988,46 +824,18 @@ export const PuzzleGame: React.FC = () => {
         undoLastPath();
       }
       
-      // Removed Ctrl+Y redo functionality since redo was removed
+      // Ctrl+Y or Ctrl+Shift+Z for redo
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
+        e.preventDefault();
+        redoLastPath();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [gameState, undoLastPath]); // Removed redoLastPath from dependencies
-
-  // Create smooth SVG path from pen movements
-  const createSmoothPath = useCallback((points: { x: number, y: number }[]) => {
-    if (points.length === 0) return "";
-    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-    
-    let path = `M ${points[0].x} ${points[0].y}`;
-    
-    for (let i = 1; i < points.length; i++) {
-      const curr = points[i];
-      
-      if (i === 1) {
-        // First line segment
-        path += ` L ${curr.x} ${curr.y}`;
-      } else {
-        // Use quadratic curves for smoothness
-        const next = points[i + 1];
-        if (next) {
-          const cpX = curr.x;
-          const cpY = curr.y;
-          const endX = (curr.x + next.x) / 2;
-          const endY = (curr.y + next.y) / 2;
-          path += ` Q ${cpX} ${cpY} ${endX} ${endY}`;
-        } else {
-          // Last point
-          path += ` L ${curr.x} ${curr.y}`;
-        }
-      }
-    }
-    
-    return path;
-  }, []);
+  }, [gameState, undoLastPath, redoLastPath]);
 
   // Memoized path data generation for better performance
   const getPathData = useCallback((cells: string[]) => {
@@ -1036,10 +844,77 @@ export const PuzzleGame: React.FC = () => {
         const { x, y } = getCenterOfCell(cell);
         return (i === 0 ? 'M' : 'L') + `${x} ${y}`;
     }).join(' ');
-  }, [currentComplexity]); // Only depend on cell size changes
+  }, [getCenterOfCell]);
   
+  // Rule 4: Fill entire grid with one path - combine all path segments
+  const allPathsData = useMemo(() => {
+    // Combine all completed paths and current path into one continuous line
+    const allCells: string[] = [];
+    
+    // Add all cells from completed paths
+    paths.forEach((path, index) => {
+      if (index === 0) {
+        // First path includes all cells
+        allCells.push(...path.cells);
+      } else {
+        // Subsequent paths skip the first cell (the connecting dot) to avoid duplication
+        allCells.push(...path.cells.slice(1));
+      }
+    });
+    
+    // Add current path cells if any, avoiding duplication at connection point
+    if (currentPath.length > 0) {
+      if (paths.length > 0) {
+        const lastCompletedPath = paths[paths.length - 1];
+        const lastCell = lastCompletedPath.cells[lastCompletedPath.cells.length - 1];
+        const firstCurrentCell = currentPath[0];
+        
+        if (lastCell === firstCurrentCell) {
+          // Skip the first cell to avoid duplication
+          allCells.push(...currentPath.slice(1));
+        } else {
+          allCells.push(...currentPath);
+        }
+      } else {
+        allCells.push(...currentPath);
+      }
+    }
+    
+    return getPathData(allCells);
+  }, [paths, currentPath, getPathData]);
+
+  // Enhanced live cursor line for smooth pen-like drawing
+  const cursorLineData = useMemo(() => {
+    if (!isDrawing || !cursorPos) return "";
+    
+    if (currentPath.length === 0) {
+      // If no path yet, don't show line (will start when first cell is added)
+      return "";
+    }
+    
+    // Always draw from the last cell in current path to cursor position
+    const lastCell = getCenterOfCell(currentPath[currentPath.length - 1]);
+    
+    // Ensure we have valid coordinates
+    if (!lastCell || !lastCell.x || !lastCell.y || !cursorPos.x || !cursorPos.y) {
+      return "";
+    }
+    
+    return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
+  }, [isDrawing, cursorPos, currentPath, getCenterOfCell]);
+  
+  // Memoized grid lines for better performance
+  const gridLines = useMemo(() => {
+    return Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
+      <g key={i} className="text-slate-700 pointer-events-none">
+        <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
+        <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
+      </g>
+    ));
+  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
   const nextDot = puzzleDots[paths.length];
-  
+
   // Memoized dots rendering for better performance
   const dotsElements = useMemo(() => {
     return puzzleDots.map(({ num, row, col }) => {
@@ -1107,56 +982,135 @@ export const PuzzleGame: React.FC = () => {
         </g>
       );
     });
-  }, [puzzleDots, occupiedCells, currentPath, nextDot, gameState, isDrawing, puzzleId, currentComplexity]);
-  
-  // Rule 4: Fill entire grid with one path - combine all path segments
-  const allPathsData = useMemo(() => {
-    // Combine all completed paths and current path into one continuous line
-    const allCells: string[] = [];
+  }, [puzzleDots, occupiedCells, currentPath, nextDot, puzzleId, currentComplexity.cellSize, reducedAnimations, gameState, isDrawing]);
+
+  // Debug logging for game state changes
+  useEffect(() => {
+    // Game state changed, can add analytics here if needed
+  }, [gameState]);
+
+  // Check for win condition when paths or currentPath changes
+  useEffect(() => {
+    if (gameState !== GAME_STATE.PLAYING) return;
     
-    // Add all cells from completed paths
-    paths.forEach((path, index) => {
-      if (index === 0) {
-        // First path includes all cells
-        allCells.push(...path.cells);
-      } else {
-        // Subsequent paths skip the first cell (the connecting dot) to avoid duplication
-        allCells.push(...path.cells.slice(1));
-      }
-    });
+    // Calculate total cells filled from completed paths only
+    // (currentPath is temporary and gets cleared when a path is completed)
+    const allCellsFromPaths = new Set(paths.flatMap(p => p.cells));
     
-    // Add current path cells if any, avoiding duplication at connection point
-    if (currentPath.length > 0) {
-      if (paths.length > 0) {
-        const lastCompletedPath = paths[paths.length - 1];
-        const lastCell = lastCompletedPath.cells[lastCompletedPath.cells.length - 1];
-        const firstCurrentCell = currentPath[0];
-        
-        if (lastCell === firstCurrentCell) {
-          // Skip the first cell to avoid duplication
-          allCells.push(...currentPath.slice(1));
-        } else {
-          allCells.push(...currentPath);
+    // Win condition: all dots connected AND all cells filled
+    const allDotsConnected = paths.length === puzzleDots.length - 1; // -1 because we count path segments between dots
+    const allCellsFilled = allCellsFromPaths.size === totalCells;
+    
+    console.log('=== WIN CHECK (useEffect) ===');
+    console.log('Paths completed:', paths.length);
+    console.log('Expected paths:', puzzleDots.length - 1);
+    console.log('All dots connected:', allDotsConnected);
+    console.log('Cells filled from completed paths:', allCellsFromPaths.size, '/', totalCells);
+    console.log('All cells filled:', allCellsFilled);
+    console.log('Should win:', allDotsConnected && allCellsFilled);
+    
+    // Debug: show which cells are filled
+    if (allDotsConnected && !allCellsFilled) {
+      console.log('🔍 Missing cells analysis:');
+      const allPossibleCells: string[] = [];
+      for (let row = 0; row < currentComplexity.gridSize; row++) {
+        for (let col = 0; col < currentComplexity.gridSize; col++) {
+          allPossibleCells.push(`${row},${col}`);
         }
+      }
+      
+      const missingCells = allPossibleCells.filter(cell => !allCellsFromPaths.has(cell));
+      console.log('Missing cells:', missingCells);
+      console.log('Filled cells:', Array.from(allCellsFromPaths).sort());
+    }
+    console.log('==========================');
+    
+    if (allDotsConnected && allCellsFilled) {
+      console.log('🎉 WIN CONDITION TRIGGERED by useEffect!');
+      
+      // Log completion event to Facebook
+      fbActions.logEvent('stage_completed', complexityLevel + 1, {
+        stage: complexityLevel + 1,
+        time: timer,
+        paths: paths.length,
+        complexity: currentComplexity.description
+      });
+      
+      // Submit score to leaderboard if in Facebook
+      if (fbState.isInitialized) {
+        const score = Math.max(1, 10000 - timer * 10);
+        fbActions.submitScore('main_leaderboard', score, {
+          stage: complexityLevel + 1,
+          time: timer,
+          complexity: currentComplexity.description
+        });
+      }
+      
+      showNotification(`🎉 Puzzle Solved! Stage ${complexityLevel + 1} Complete!`, 'success');
+      setGameState(GAME_STATE.WON);
+      setCurrentPath([]);
+      setIsDrawing(false);
+      setCursorPos(null);
+    }
+  }, [paths, currentPath, gameState, puzzleDots.length, totalCells, complexityLevel, timer, currentComplexity, fbActions, fbState, showNotification]);
+
+  // Test puzzle generation once on component mount  
+  useEffect(() => {
+    console.log('🚀 PuzzleGame component initialized');
+  }, []);
+
+  // Debug effect to log puzzle state
+  useEffect(() => {
+    console.log('🔍 CURRENT PUZZLE STATE:');
+    console.log('Puzzle dots:', puzzleDots);
+    console.log('Validated solution:', validatedSolution);
+    console.log('Complexity level:', complexityLevel);
+    console.log('Current complexity:', currentComplexity);
+    
+    if (puzzleDots.length > 0 && validatedSolution.length > 0) {
+      const endDot = puzzleDots.find(d => d.num === puzzleDots.length);
+      const endDotCell = endDot ? `${endDot.row},${endDot.col}` : 'NOT_FOUND';
+      const solutionEndCell = validatedSolution[validatedSolution.length - 1];
+      
+      console.log('🎯 END DOT ANALYSIS:');
+      console.log('Last dot number:', puzzleDots.length);
+      console.log('Last dot position:', endDotCell);
+      console.log('Solution ends at:', solutionEndCell);
+      console.log('Positions match:', endDotCell === solutionEndCell ? '✅ CORRECT' : '❌ WRONG');
+      
+      // Check if solution visits all cells
+      console.log('Solution length:', validatedSolution.length);
+      console.log('Expected cells:', currentComplexity.gridSize * currentComplexity.gridSize);
+      console.log('Visits all cells:', validatedSolution.length === (currentComplexity.gridSize * currentComplexity.gridSize) ? '✅' : '❌');
+    }
+  }, [puzzleDots, validatedSolution, complexityLevel, currentComplexity]);
+
+  // Test function to validate current generation
+  const testCurrentGeneration = useCallback(() => {
+    console.log('🧪 TESTING CURRENT GENERATION...');
+    
+    for (let i = 0; i < Math.min(5, COMPLEXITY_LEVELS.length); i++) {
+      const complexity = COMPLEXITY_LEVELS[i];
+      console.log(`\n--- Testing Stage ${i + 1}: ${complexity.description} ---`);
+      
+      const result = generateRandomDotsWithSolution(complexity);
+      
+      console.log(`Generated ${result.dots.length} dots:`, result.dots.map(d => `${d.num}:(${d.row},${d.col})`));
+      console.log(`Solution length: ${result.solution.length}/${complexity.gridSize * complexity.gridSize}`);
+      
+      if (result.solution.length === complexity.gridSize * complexity.gridSize) {
+        console.log('✅ Stage', i + 1, 'generation: SUCCESS');
       } else {
-        allCells.push(...currentPath);
+        console.log('❌ Stage', i + 1, 'generation: FAILED');
       }
     }
     
-    return getPathData(allCells);
-  }, [paths, currentPath]);
-
-  // Enhanced live cursor line for smooth pen-like drawing
-  const cursorLineData = useMemo(() => {
-    if (!isDrawing || penPathRef.current.length === 0) return "";
-    
-    // Use the smooth pen path for natural drawing
-    return createSmoothPath(penPathRef.current);
-  }, [isDrawing, penPathUpdate, createSmoothPath]);
+    showNotification('🧪 Generation test complete! Check console for results.', 'info');
+  }, [showNotification]);
 
   return (
     <div 
-      className="game-area"
+      className="w-full min-h-screen bg-gradient-main p-2 relative overflow-hidden game-area"
       onDragStart={(e) => e.preventDefault()} // Prevent drag
     >
       {/* Notification */}
@@ -1166,7 +1120,7 @@ export const PuzzleGame: React.FC = () => {
             initial={reducedAnimations ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.9 }}
             animate={reducedAnimations ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
             exit={reducedAnimations ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.9 }}
-            transition={reducedAnimations ? { duration: 0.15 } : { duration: 0.2 }}
+            transition={reducedAnimations ? { duration: 0.2 } : { duration: 0.3 }}
             className={`notification ${notification.type}`}
           >
             {notification.message}
@@ -1176,82 +1130,87 @@ export const PuzzleGame: React.FC = () => {
       
       {/* Game Container - Mobile First Design */}
       <div className="game-container">
-        {/* Game Title with Inline Logo */}
-        <div className="game-title">
-          <h1>
-            H
-            <picture>
-              <source srcSet="/hart-logo.webp" type="image/webp" />
-              <img 
-                src="/hart-logo-optimized.png" 
-                alt="a" 
-                className="inline-logo"
-              />
-            </picture>
-            rtTrace
-          </h1>
-        </div>
-        
         {/* Header Section - Mobile Optimized */}
         <div className="header-section">
-          <div className="stage-timer-section">
-            {/* Stage Info - Compact Single Line */}
+          <div className="flex flex-col items-center gap-2">
+            {/* Stage Info - Prominent on Mobile */}
             <div className="stage-info">
-              <div className="stage-title-compact">
+              <div className="stage-title">
                 <span className="stage-emoji">🏆</span>
                 <span className="stage-number">Stage {complexityLevel + 1}</span>
-                <span className="stage-description-inline">- {currentComplexity.description}</span>
               </div>
+              <span className="stage-description">{currentComplexity.description}</span>
               {/* Show player name if in Facebook */}
               {fbState.isInitialized && fbState.playerName !== 'Player' && (
                 <span className="player-name">Playing as {fbState.playerName}</span>
               )}
             </div>
             
-            {/* Timers - Combined on Same Line */}
-            <div className="timer-container-combined">
-              <div className="timer-item">
-                <ClockIcon className="icon-base"/>
-                <span className="timer-time">{new Date(timer * 1000).toISOString().substr(14, 5)}</span>
-              </div>
-              <div className="timer-separator">•</div>
-              <div className="timer-item global">
-                <span>🌍</span>
-                <span className="timer-time">Total: {new Date(globalTimer * 1000).toISOString().substr(14, 5)}</span>
-              </div>
+            {/* Timer - Compact on Mobile */}
+            <div className="timer-container">
+              <ClockIcon className="icon-base"/>
+              <span className="timer-time">{new Date(timer * 1000).toISOString().substr(14, 5)}</span>
             </div>
           </div>
-          
           {/* Controls - Mobile Optimized Grid */}
           <div className="controls-grid">
             <button onClick={resetGame} className="control-button reset">
-                <span className="btn-icon">↻</span>
-                <span className="btn-text">Reset</span>
-            </button>
-            <button 
-              onClick={resetAllProgress}
-              className="control-button reset"
-              style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
-              title="Reset to Stage 1 and clear ALL progress records"
-            >
-                <span className="btn-icon">🔄</span>
-                <span className="btn-text">Reset All</span>
+                <ReplayIcon className="icon-sm" />
+                <span className="hidden-sm">Reset</span>
+                <span className="sm:hidden">↻</span>
             </button>
             <button 
               onClick={undoLastPath}
-              disabled={paths.length === 0 && currentPath.length === 0}
-              className={`control-button ${paths.length === 0 && currentPath.length === 0 ? 'undo disabled' : 'undo'}`}
+              disabled={paths.length === 0}
+              className={`control-button ${paths.length === 0 ? 'undo disabled' : 'undo'}`}
             >
-                <span className="btn-icon">🔙</span>
-                <span className="btn-text">Undo</span>
+                <span className="text-xs">🔙</span>
+                <span className="hidden-sm">Undo</span>
             </button>
             <button 
-              onClick={() => setShowProgressSummary(true)}
-              className="control-button progress"
-              title="View Progress Summary"
+              onClick={redoLastPath}
+              disabled={redoHistory.length === 0}
+              className={`control-button ${redoHistory.length === 0 ? 'redo disabled' : 'redo'}`}
             >
-                <span className="btn-icon">📈</span>
-                <span className="btn-text">Progress</span>
+                <span className="text-xs">🔄</span>
+                <span className="hidden-sm">Redo</span>
+            </button>
+            <button 
+              onClick={startNewGame}
+              className="control-button new"
+            >
+                <span className="text-xs">🎲</span>
+                <span className="hidden-sm">New</span>
+            </button>
+            <button 
+              onClick={showTipHandler}
+              disabled={gameState === GAME_STATE.WON}
+              className={`control-button ${gameState === GAME_STATE.WON ? 'tip disabled' : 'tip'}`}
+            >
+                <span className="text-xs">💡</span>
+                <span className="hidden-sm">Tip</span>
+            </button>
+            <button 
+              onClick={() => {
+                setComplexityLevel(0);
+                const puzzleResult = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]);
+                setPuzzleDots(puzzleResult.dots);
+                setValidatedSolution(puzzleResult.solution);
+                resetGame();
+                showNotification('🔄 Progress reset! Back to Stage 1', 'info');
+              }}
+              className="control-button reset-progress"
+            >
+                <span className="text-xs">🔄</span>
+                <span>Reset Progress</span>
+            </button>
+            <button 
+              onClick={testCurrentGeneration}
+              className="control-button"
+              style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+            >
+                <span className="text-xs">🧪</span>
+                <span>Test Gen</span>
             </button>
           </div>
         </div>
@@ -1260,7 +1219,7 @@ export const PuzzleGame: React.FC = () => {
         <div className="game-board-container">
           <svg
             ref={svgRef}
-            className={`game-board game-svg ${isDrawing ? 'drawing' : ''}`}
+            className={`game-board puzzle-svg ${isDrawing ? 'drawing' : ''}`}
             onMouseDown={handleInteractionStart}
             onTouchStart={handleInteractionStart}
             style={{ touchAction: 'none', aspectRatio: '1/1' }}
@@ -1283,17 +1242,51 @@ export const PuzzleGame: React.FC = () => {
                 />
               )}
               
-              {/* Live drawing cursor line - clean simple version */}
+              {/* Live drawing cursor line - enhanced pen-like drawing */}
               {isDrawing && cursorPos && currentPath.length >= 1 && cursorLineData && (
-                <path 
-                  d={cursorLineData} 
-                  stroke="url(#path-gradient)" 
-                  strokeWidth="12" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  fill="none" 
-                  opacity="0.8"
-                />
+                <g className="cursor-line-glow">
+                  {/* Background glow for pen effect */}
+                  <path 
+                    d={cursorLineData} 
+                    stroke="#22d3ee" 
+                    strokeWidth="20" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    fill="none" 
+                    opacity="0.2"
+                    filter="blur(2px)"
+                  />
+                  {/* Outer glow */}
+                  <path 
+                    d={cursorLineData} 
+                    stroke="#22d3ee" 
+                    strokeWidth="16" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    fill="none" 
+                    opacity="0.4"
+                  />
+                  {/* Main cursor line */}
+                  <path 
+                    d={cursorLineData} 
+                    stroke="url(#path-gradient)" 
+                    strokeWidth="12" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    fill="none" 
+                    opacity="0.9"
+                  />
+                  {/* Inner highlight for pen shine effect */}
+                  <path 
+                    d={cursorLineData} 
+                    stroke="#ffffff" 
+                    strokeWidth="4" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    fill="none" 
+                    opacity="0.6"
+                  />
+                </g>
               )}
               
               {/* Tip/Solution path - enhanced visibility with animation */}
@@ -1338,7 +1331,7 @@ export const PuzzleGame: React.FC = () => {
               )}
             </g>
             
-            {/* Dots */}
+            {/* Dots - Memoized for performance */}
             <g className="pointer-events-none">
               {dotsElements}
             </g>
@@ -1360,10 +1353,15 @@ export const PuzzleGame: React.FC = () => {
         <div className="instructions">
           <div className="instructions-text">
             Connect dots <span className="instructions-start">1 (START)</span> to <span className="instructions-end">{puzzleDots[puzzleDots.length - 1].num} (END)</span>
-            <br />
-            <span> • </span>Fill every cell to win!
+            <br className="hidden-sm" />
+            <span className="sm:hidden"> • </span>Fill every cell to win!
             <br />
             <span className="instructions-tip">💡 Tap Undo/Redo or use Ctrl+Z/Y</span>
+            {/* Debug info - Remove in production */}
+            <br />
+            <span style={{ fontSize: '10px', color: '#666' }}>
+              Debug: Level {complexityLevel}, Expected: {currentComplexity.numDots} dots, Actual: {puzzleDots.length} dots
+            </span>
           </div>
         </div>
         
@@ -1381,17 +1379,6 @@ export const PuzzleGame: React.FC = () => {
             >
               🚀 Play on Facebook
             </button>
-            
-            {/* Add ShareButton component for testing */}
-            <div style={{ marginTop: '0.5rem' }}>
-              <ShareButton 
-                level={complexityLevel + 1}
-                time={timer}
-                className="facebook-cta-button"
-              >
-                📤 Share Progress
-              </ShareButton>
-            </div>
           </div>
         )}
       </div>
@@ -1406,316 +1393,76 @@ export const PuzzleGame: React.FC = () => {
         </div>
       )}
 
-      {/* Progress Summary Modal */}
-      <AnimatePresence>
-        {showProgressSummary && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={reducedAnimations ? { duration: 0.1 } : { duration: 0.2 }}
-            className="victory-overlay"
-            onClick={() => setShowProgressSummary(false)}
-          >
-            <motion.div
-              initial={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
-              animate={reducedAnimations ? { opacity: 1 } : { scale: 1, y: 0 }}
-              exit={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
-              transition={reducedAnimations ? { duration: 0.15 } : { duration: 0.25 }}
-              className="victory-content"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="victory-emoji">📈</div>
-              <h2 className="victory-title">Progress Summary</h2>
-              
-              <div className="victory-details">
-                <p className="victory-stage">Current Stage: {complexityLevel + 1} of 12</p>
-                <p className="victory-stats">Current Session: {new Date(globalTimer * 1000).toISOString().substr(11, 8)}</p>
-                
-                {/* Overall Statistics */}
-                <div className="completion-stats">
-                  <div className="stats-section">
-                    <h3 className="stats-title">🏆 Your Records</h3>
-                    <p className="stats-highlight">Game Completions: {totalGameCompletions}</p>
-                    <p className="stats-highlight">
-                      Best Total Time: {bestTotalTime === Infinity ? 'None yet' : new Date(bestTotalTime * 1000).toISOString().substr(11, 8)}
-                    </p>
-                    <p className="stats-highlight">Stages Completed: {stageCompletionTimes.length}/12</p>
-                  </div>
-                </div>
-                
-                {/* Stage-by-stage breakdown */}
-                {stageCompletionTimes.length > 0 && (
-                  <div className="stage-breakdown">
-                    <h4 className="breakdown-title">📊 Best Stage Times:</h4>
-                    <div className="stage-times-grid">
-                      {Array.from({ length: 12 }, (_, index) => {
-                        const time = stageCompletionTimes[index];
-                        return (
-                          <div key={index} className={`stage-time-item ${time ? 'completed' : 'incomplete'}`}>
-                            <span className="stage-number">S{index + 1}</span>
-                            <span className="stage-time">
-                              {time ? new Date(time * 1000).toISOString().substr(14, 5) : '--:--'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Progress percentage */}
-                <div className="progress-indicator">
-                  <p className="progress-text">
-                    Progress: {Math.round((stageCompletionTimes.length / 12) * 100)}% Complete
-                  </p>
-                  <div className="progress-bar">
-                    <div 
-                      className="progress-fill" 
-                      style={{ width: `${(stageCompletionTimes.length / 12) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-                
-                {/* Motivational messages */}
-                {stageCompletionTimes.length === 0 && (
-                  <p className="motivation-text">🌟 Start your journey! Complete stages to track your progress.</p>
-                )}
-                {stageCompletionTimes.length > 0 && stageCompletionTimes.length < 6 && (
-                  <p className="motivation-text">🚀 Great start! Keep going to unlock harder challenges.</p>
-                )}
-                {stageCompletionTimes.length >= 6 && stageCompletionTimes.length < 12 && (
-                  <p className="motivation-text">🔥 You're on fire! Master the remaining stages.</p>
-                )}
-                {stageCompletionTimes.length === 12 && (
-                  <p className="motivation-text">🏆 MASTER ACHIEVED! You've conquered all stages!</p>
-                )}
-              </div>
-              
-              <div className="victory-buttons">
-                <button 
-                  onClick={() => setShowProgressSummary(false)}
-                  className="victory-button retry"
-                >
-                  ✓ Continue Playing
-                </button>
-                
-                {/* Social sharing from progress summary */}
-                {fbState.isInitialized && stageCompletionTimes.length > 0 && (
-                  <button 
-                    onClick={() => {
-                      const completionPercentage = Math.round((stageCompletionTimes.length / 12) * 100);
-                      const shareMessage = stageCompletionTimes.length === 12
-                        ? `🏆 I've MASTERED all 12 stages! My best time: ${new Date(bestTotalTime * 1000).toISOString().substr(11, 8)}. Think you can beat me?`
-                        : `🎯 I'm ${completionPercentage}% through the puzzle challenge! Currently on Stage ${complexityLevel + 1}. Join me!`;
-                      
-                      fbActions.shareGame({
-                        stage: complexityLevel + 1,
-                        time: globalTimer,
-                        message: shareMessage
-                      });
-                      setShowProgressSummary(false);
-                    }}
-                    className="victory-share-button"
-                  >
-                    📤 Share Progress
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Victory Screen Overlay - Enhanced with Progress Tracking */}
+      {/* Victory Screen Overlay - Mobile Optimized */}
       <AnimatePresence>
         {gameState === GAME_STATE.WON && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={reducedAnimations ? { duration: 0.1 } : { duration: 0.2 }}
+            transition={reducedAnimations ? { duration: 0.2 } : undefined}
             className="victory-overlay"
           >
             <motion.div
               initial={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
               animate={reducedAnimations ? { opacity: 1 } : { scale: 1, y: 0 }}
               exit={reducedAnimations ? { opacity: 0 } : { scale: 0.8, y: 20 }}
-              transition={reducedAnimations ? { duration: 0.15 } : { duration: 0.25 }}
+              transition={reducedAnimations ? { duration: 0.3 } : { duration: 0.5 }}
               className="victory-content"
             >
-              {/* Dynamic victory celebration based on completion level */}
-              {complexityLevel === COMPLEXITY_LEVELS.length - 1 ? (
-                <div className="victory-emoji">🏆</div>
-              ) : (
-                <div className="victory-emoji">🎉</div>
-              )}
-              
-              <h2 className="victory-title">
-                {complexityLevel === COMPLEXITY_LEVELS.length - 1 ? 'MASTER COMPLETE!' : 'Puzzle Solved!'}
-              </h2>
-              
+              <div className="victory-emoji">🎉</div>
+              <h2 className="victory-title">Puzzle Solved!</h2>
               <div className="victory-details">
                 <p className="victory-stage">Stage {complexityLevel + 1} Complete!</p>
-                <p className="victory-stats">Stage Time: {new Date(timer * 1000).toISOString().substr(14, 5)}</p>
-                <p className="victory-stats">Total Progress: {new Date(globalTimer * 1000).toISOString().substr(14, 5)}</p>
+                <p className="victory-stats">Time: {new Date(timer * 1000).toISOString().substr(14, 5)}</p>
                 <p className="victory-stats">Paths Used: {paths.length}</p>
-                
-                {/* Enhanced completion statistics */}
-                {complexityLevel === COMPLEXITY_LEVELS.length - 1 && (
-                  <div className="completion-stats">
-                    <div className="stats-section">
-                      <h3 className="stats-title">🎊 GAME COMPLETED! 🎊</h3>
-                      <p className="stats-highlight">Total Completions: {totalGameCompletions + 1}</p>
-                      <p className="stats-highlight">
-                        Best Time: {bestTotalTime === Infinity ? 'First completion!' : new Date(Math.min(globalTimer, bestTotalTime) * 1000).toISOString().substr(11, 8)}
-                      </p>
-                      {globalTimer < bestTotalTime && (
-                        <p className="stats-new-record">🥇 NEW PERSONAL BEST!</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Stage-by-stage breakdown for completed stages */}
-                {stageCompletionTimes.length > 0 && (
-                  <div className="stage-breakdown">
-                    <h4 className="breakdown-title">📊 Stage Times:</h4>
-                    <div className="stage-times-grid">
-                      {stageCompletionTimes.map((time, index) => (
-                        <div key={index} className="stage-time-item">
-                          <span className="stage-number">S{index + 1}:</span>
-                          <span className="stage-time">{new Date(time * 1000).toISOString().substr(14, 5)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
               
               <div className="victory-buttons">
-                {(() => {
-                  console.log('🏆 VICTORY DEBUG:', { 
-                    complexityLevel, 
-                    maxLevel: COMPLEXITY_LEVELS.length - 1,
-                    shouldShowNext: complexityLevel < COMPLEXITY_LEVELS.length - 1,
-                    totalLevels: COMPLEXITY_LEVELS.length 
-                  });
-                  return null;
-                })()}
-                
                 {complexityLevel < COMPLEXITY_LEVELS.length - 1 ? (
                   <button 
                     onClick={advanceToNextLevel}
                     className="victory-button next"
                   >
-                    🚀 Next Stage (to Stage {complexityLevel + 2})
+                    🚀 Next Stage
                   </button>
                 ) : (
                   <div className="victory-complete">
-                    <h3 className="complete-title">🏆 ALL STAGES MASTERED! 🏆</h3>
-                    <p className="complete-subtitle">You've conquered all 12 stages!</p>
+                    🏆 All Stages Complete! 🏆
                   </div>
                 )}
                 
-                {/* Social sharing and leaderboard section */}
+                <button 
+                  onClick={startNewGame}
+                  className="victory-button new"
+                >
+                  🎲 New Stage {complexityLevel + 1}
+                </button>
+                
+                <button 
+                  onClick={resetGame}
+                  className="victory-button retry"
+                >
+                  🔄 Try Again
+                </button>
+
+                {/* Facebook sharing options */}
                 {fbState.isInitialized && (
-                  <div className="victory-social-section">
-                    <div className="social-buttons">
-                      <button 
-                        onClick={() => {
-                          const isGameComplete = complexityLevel === COMPLEXITY_LEVELS.length - 1;
-                          const shareMessage = isGameComplete 
-                            ? `� I just MASTERED all 12 stages in ${new Date(globalTimer * 1000).toISOString().substr(11, 8)} total time! Think you can beat me?`
-                            : `🎯 Just solved Stage ${complexityLevel + 1} in ${new Date(timer * 1000).toISOString().substr(14, 5)}! Can you do better?`;
-                          
-                          fbActions.shareGame({
-                            stage: complexityLevel + 1,
-                            time: timer,
-                            message: shareMessage
-                          });
-                        }}
-                        className="victory-share-button"
-                      >
-                        � Share {complexityLevel === COMPLEXITY_LEVELS.length - 1 ? 'Master Achievement' : 'Stage Victory'}
-                      </button>
-                      
-                      <button 
-                        onClick={() => {
-                          const score = complexityLevel === COMPLEXITY_LEVELS.length - 1 
-                            ? Math.max(1, 100000 - globalTimer * 10) // Higher score for full completion
-                            : Math.max(1, 10000 - timer * 10);
-                          
-                          fbActions.submitScore('main_leaderboard', score, {
-                            stage: complexityLevel + 1,
-                            time: timer,
-                            totalTime: globalTimer,
-                            complexity: currentComplexity.description,
-                            isGameComplete: complexityLevel === COMPLEXITY_LEVELS.length - 1
-                          });
-                          
-                          showNotification('🏆 Score submitted to leaderboard!', 'success');
-                        }}
-                        className="victory-leaderboard-button"
-                      >
-                        🏆 Submit to Leaderboard
-                      </button>
-                      
-                      <button 
-                        onClick={async () => {
-                          try {
-                            const leaderboard = await fbActions.getLeaderboard('main_leaderboard');
-                            console.log('🏆 LEADERBOARD:', leaderboard);
-                            showNotification(`📊 Found ${leaderboard.length} leaderboard entries!`, 'info');
-                          } catch (error) {
-                            console.error('Leaderboard error:', error);
-                            showNotification('📊 Leaderboard not available', 'info');
-                          }
-                        }}
-                        className="victory-leaderboard-button"
-                      >
-                        📊 View Leaderboard
-                      </button>
-                    </div>
-                    
-                    {/* Competitive message for completed game */}
-                    {complexityLevel === COMPLEXITY_LEVELS.length - 1 && (
-                      <div className="competitive-section">
-                        <p className="competitive-text">
-                          🎯 Challenge friends to beat your {new Date(globalTimer * 1000).toISOString().substr(11, 8)} completion time!
-                        </p>
-                      </div>
-                    )}
+                  <div className="victory-share-section">
+                    <button 
+                      onClick={() => {
+                        fbActions.shareGame({
+                          stage: complexityLevel + 1,
+                          time: timer,
+                          message: `I just solved Stage ${complexityLevel + 1} in ${new Date(timer * 1000).toISOString().substr(14, 5)}! Can you beat my time?`
+                        });
+                      }}
+                      className="victory-share-button"
+                    >
+                      📤 Share Victory
+                    </button>
                   </div>
                 )}
-                
-                {/* Action buttons */}
-                <div className="action-buttons">
-                  
-                  <button 
-                    onClick={resetGame}
-                    className="victory-button retry"
-                  >
-                    🔄 Try Again
-                  </button>
-                  
-                  {/* Share Result Button - Always available */}
-                  <ShareButton 
-                    level={complexityLevel + 1}
-                    time={globalTimer}
-                    className="victory-button share"
-                  >
-                    📲 Share Result
-                  </ShareButton>
-                  
-                  <button 
-                    onClick={resetAllProgress}
-                    className="victory-button retry"
-                    style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
-                  >
-                    🏁 Reset All Progress
-                  </button>
-                </div>
               </div>
             </motion.div>
           </motion.div>
