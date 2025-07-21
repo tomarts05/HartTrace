@@ -30,6 +30,29 @@ export const PuzzleGame: React.FC = () => {
   const svgRectCacheRef = useRef<{ rect: DOMRect; timestamp: number } | null>(null);
   const RECT_CACHE_DURATION = 100; // Cache getBoundingClientRect for 100ms
   
+  // Enhanced performance caching for coordinate transformations
+  const coordinateTransformCacheRef = useRef<{
+    svgWidth: number;
+    svgHeight: number;
+    rect: DOMRect;
+    scaleX: number;
+    scaleY: number;
+    timestamp: number;
+  } | null>(null);
+  const COORDINATE_CACHE_DURATION = 50; // Cache coordinate transforms for 50ms
+  
+  // Pre-calculated cell positions cache
+  const cellPositionCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const cellCacheValidRef = useRef(false);
+  
+  // Refs for high-frequency updates that don't need re-renders
+  const cursorPosRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingStateUpdatesRef = useRef({
+    cursorPos: null as { x: number; y: number } | null,
+    currentPath: null as string[] | null,
+    needsUpdate: false
+  });
+  
   // Facebook Instant Games integration
   const [fbState, fbActions] = useFBInstant();
   
@@ -413,7 +436,7 @@ export const PuzzleGame: React.FC = () => {
     console.log('🎲 NEW GAME: Complete!');
   }, [currentComplexity, complexityLevel, showNotification, fbActions]);
 
-  // Optimized coordinate calculation with caching
+  // Optimized coordinate calculation with enhanced caching
   const getCachedSVGRect = useCallback(() => {
     if (!svgRef.current) return null;
     
@@ -431,23 +454,83 @@ export const PuzzleGame: React.FC = () => {
     return rect;
   }, []);
 
+  // Performance-optimized coordinate transformation with aggressive caching
+  const getCachedCoordinateTransform = useCallback(() => {
+    if (!svgRef.current) return null;
+    
+    const now = performance.now();
+    const cache = coordinateTransformCacheRef.current;
+    
+    // Use cached transform if it's fresh
+    if (cache && (now - cache.timestamp) < COORDINATE_CACHE_DURATION) {
+      return cache;
+    }
+    
+    // Calculate fresh transform and cache it
+    const rect = getCachedSVGRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    
+    const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
+    const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
+    const scaleX = svgWidth / rect.width;
+    const scaleY = svgHeight / rect.height;
+    
+    const transform = {
+      svgWidth,
+      svgHeight,
+      rect,
+      scaleX,
+      scaleY,
+      timestamp: now
+    };
+    
+    coordinateTransformCacheRef.current = transform;
+    return transform;
+  }, [getCachedSVGRect, currentComplexity.gridSize, currentComplexity.cellSize]);
+
+  // Pre-calculate and cache cell center positions for the current grid
+  const getCachedCellPositions = useCallback(() => {
+    const cacheKey = `${currentComplexity.gridSize}-${currentComplexity.cellSize}`;
+    
+    if (cellCacheValidRef.current && cellPositionCacheRef.current.size > 0) {
+      return cellPositionCacheRef.current;
+    }
+    
+    // Clear and rebuild cache
+    cellPositionCacheRef.current.clear();
+    
+    for (let row = 0; row < currentComplexity.gridSize; row++) {
+      for (let col = 0; col < currentComplexity.gridSize; col++) {
+        const cell = `${row},${col}`;
+        const x = col * currentComplexity.cellSize + currentComplexity.cellSize / 2;
+        const y = row * currentComplexity.cellSize + currentComplexity.cellSize / 2;
+        cellPositionCacheRef.current.set(cell, { x, y });
+      }
+    }
+    
+    cellCacheValidRef.current = true;
+    return cellPositionCacheRef.current;
+  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
+  // Invalidate cell position cache when grid changes
+  useEffect(() => {
+    cellCacheValidRef.current = false;
+    coordinateTransformCacheRef.current = null;
+  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
   const getCellFromEvent = useCallback((e: PointEvent): string | null => {
     if (!svgRef.current) return null;
     
     try {
-      const rect = getCachedSVGRect();
-      if (!rect) return null;
+      const transform = getCachedCoordinateTransform();
+      if (!transform) return null;
       
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = e.clientX - transform.rect.left;
+      const y = e.clientY - transform.rect.top;
       
-      // Convert screen coordinates to SVG coordinates
-      const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
-      const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
-      
-      // Scale coordinates from screen space to SVG space
-      const svgX = (x / rect.width) * svgWidth;
-      const svgY = (y / rect.height) * svgHeight;
+      // Use cached scale factors for faster coordinate conversion
+      const svgX = x * transform.scaleX;
+      const svgY = y * transform.scaleY;
       
       // Convert to grid coordinates
       const col = Math.floor(svgX / currentComplexity.cellSize);
@@ -463,16 +546,24 @@ export const PuzzleGame: React.FC = () => {
       console.warn('Error getting cell from event:', error);
       return null;
     }
-  }, [currentComplexity, getCachedSVGRect]);
+  }, [currentComplexity, getCachedCoordinateTransform]);
 
-  // Memoized cell center calculation for better performance
+  // Optimized cell center calculation using pre-calculated cache
   const getCenterOfCell = useCallback((cell: string): { x: number, y: number } => {
+    const cellPositions = getCachedCellPositions();
+    const cached = cellPositions.get(cell);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    // Fallback calculation if not in cache
     const [row, col] = cell.split(',').map(Number);
     return {
       x: col * currentComplexity.cellSize + currentComplexity.cellSize / 2,
       y: row * currentComplexity.cellSize + currentComplexity.cellSize / 2,
     };
-  }, [currentComplexity.cellSize]);
+  }, [getCachedCellPositions, currentComplexity.cellSize]);
 
   const handleInteractionStart = useCallback((e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
     e.preventDefault(); // Prevent default browser behavior
@@ -581,6 +672,28 @@ export const PuzzleGame: React.FC = () => {
     }
   }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showTip, showNotification, currentPath]);
   
+  // Add a batch update function using requestAnimationFrame
+  const batchedStateUpdateRef = useRef<{
+    scheduled: boolean;
+    updates: (() => void)[];
+  }>({ scheduled: false, updates: [] });
+
+  const scheduleBatchedUpdate = useCallback((updateFn: () => void) => {
+    batchedStateUpdateRef.current.updates.push(updateFn);
+    
+    if (!batchedStateUpdateRef.current.scheduled) {
+      batchedStateUpdateRef.current.scheduled = true;
+      requestAnimationFrame(() => {
+        const updates = batchedStateUpdateRef.current.updates;
+        batchedStateUpdateRef.current.updates = [];
+        batchedStateUpdateRef.current.scheduled = false;
+        
+        // Execute all batched updates at once
+        updates.forEach(update => update());
+      });
+    }
+  }, []);
+
   const handleInteractionMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDrawing) return;
     
@@ -597,35 +710,35 @@ export const PuzzleGame: React.FC = () => {
     const point = 'touches' in e ? e.touches[0] : e;
     if (!point) return;
 
-    // CONTINUOUS DRAWING: Always update cursor position for smooth pen-like drawing
-    // Update immediately for responsive drawing
+    // OPTIMIZED CONTINUOUS DRAWING: Use cached coordinate transform
     if (svgRef.current) {
       try {
-        const rect = getCachedSVGRect();
+        const transform = getCachedCoordinateTransform();
         
-        // Ensure we have valid dimensions
-        if (!rect || rect.width === 0 || rect.height === 0) {
+        // Ensure we have valid transform
+        if (!transform) {
           return;
         }
         
-        const x = point.clientX - rect.left;
-        const y = point.clientY - rect.top;
+        const x = point.clientX - transform.rect.left;
+        const y = point.clientY - transform.rect.top;
         
-        // Convert screen coordinates to SVG coordinates
-        const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
-        const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
-        
-        // Scale coordinates from screen space to SVG space
-        const svgX = (x / rect.width) * svgWidth;
-        const svgY = (y / rect.height) * svgHeight;
+        // Use cached scale factors for faster coordinate conversion
+        const svgX = x * transform.scaleX;
+        const svgY = y * transform.scaleY;
         
         // Validate coordinates are reasonable
         if (isNaN(svgX) || isNaN(svgY)) {
           return;
         }
         
-        // IMMEDIATELY update cursor position for continuous line drawing
-        setCursorPos({ x: svgX, y: svgY });
+        // Store in ref for immediate access, batch state update
+        cursorPosRef.current = { x: svgX, y: svgY };
+        
+        // Batch the cursor position update for rendering
+        scheduleBatchedUpdate(() => {
+          setCursorPos({ x: svgX, y: svgY });
+        });
       } catch (error) {
         console.warn('Error setting cursor position:', error);
         return; // Exit early if coordinate calculation fails
@@ -641,16 +754,19 @@ export const PuzzleGame: React.FC = () => {
     const lastCellInPath = currentPath[currentPath.length - 1];
     if (cell === lastCellInPath) return; // Still in same cell
 
-    // Rule 2: Connect adjacent cells (no diagonals) first
-    const [lastRow, lastCol] = lastCellInPath.split(',').map(Number);
-    const [currRow, currCol] = cell.split(',').map(Number);
+    // Rule 2: Connect adjacent cells (no diagonals) first - optimized calculation
+    const lastCellParts = lastCellInPath.split(',');
+    const cellParts = cell.split(',');
+    const lastRow = parseInt(lastCellParts[0], 10);
+    const lastCol = parseInt(lastCellParts[1], 10);
+    const currRow = parseInt(cellParts[0], 10);
+    const currCol = parseInt(cellParts[1], 10);
+    
     const rowDiff = Math.abs(lastRow - currRow);
     const colDiff = Math.abs(lastCol - currCol);
     
     // Ensure only horizontal or vertical movement
-    const isHorizontal = (rowDiff === 0 && colDiff === 1);
-    const isVertical = (rowDiff === 1 && colDiff === 0);
-    const isAdjacent = isHorizontal || isVertical;
+    const isAdjacent = (rowDiff === 0 && colDiff === 1) || (rowDiff === 1 && colDiff === 0);
 
     if (!isAdjacent) {
       return; // Don't add non-adjacent cells, but continue showing cursor line
@@ -762,7 +878,8 @@ export const PuzzleGame: React.FC = () => {
     }
   }, [
     updateThrottle,
-    getCachedSVGRect,
+    getCachedCoordinateTransform,
+    scheduleBatchedUpdate,
     currentPath, 
     occupiedCells, 
     getCellFromEvent, 
@@ -772,19 +889,14 @@ export const PuzzleGame: React.FC = () => {
     setSolutionPath, 
     setShowTip, 
     saveToHistory, 
-    currentComplexity,
+    currentComplexity.gridSize,
     totalCells,
-    fbActions,
+    fbActions.logEvent,
+    fbActions.submitScore,
     complexityLevel,
     timer,
     fbState.isInitialized,
-    showNotification,
-    setGameState,
-    setCurrentPath,
-    setIsDrawing,
-    setCursorPos,
-    setPaths,
-    solutionPath
+    showNotification
   ]);
 
   const handleInteractionEnd = useCallback(() => {
@@ -837,14 +949,60 @@ export const PuzzleGame: React.FC = () => {
     };
   }, [gameState, undoLastPath, redoLastPath]);
 
-  // Memoized path data generation for better performance
+  // Optimized path data generation with pre-calculated cell positions
   const getPathData = useCallback((cells: string[]) => {
     if (cells.length === 0) return "";
+    
+    const cellPositions = getCachedCellPositions();
+    
     return cells.map((cell, i) => {
+      const pos = cellPositions.get(cell);
+      if (!pos) {
+        // Fallback calculation
         const { x, y } = getCenterOfCell(cell);
         return (i === 0 ? 'M' : 'L') + `${x} ${y}`;
+      }
+      return (i === 0 ? 'M' : 'L') + `${pos.x} ${pos.y}`;
     }).join(' ');
-  }, [getCenterOfCell]);
+  }, [getCachedCellPositions, getCenterOfCell]);
+  
+  // Optimized cursor line data with reduced recalculation
+  const cursorLineData = useMemo(() => {
+    if (!isDrawing || !cursorPos) return "";
+    
+    if (currentPath.length === 0) {
+      return "";
+    }
+    
+    // Use cached cell position for better performance
+    const lastCellKey = currentPath[currentPath.length - 1];
+    const cellPositions = getCachedCellPositions();
+    const lastCell = cellPositions.get(lastCellKey);
+    
+    if (!lastCell || !cursorPos.x || !cursorPos.y) {
+      return "";
+    }
+    
+    return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
+  }, [isDrawing, cursorPos, currentPath, getCachedCellPositions]);
+  
+  // Memoized grid lines for better performance
+  const gridLines = useMemo(() => {
+    const { gridSize, cellSize } = currentComplexity;
+    const totalSize = gridSize * cellSize;
+    
+    return Array.from({ length: gridSize + 1 }).map((_, i) => {
+      const pos = i * cellSize;
+      return (
+        <g key={i} className="text-slate-700 pointer-events-none">
+          <line x1={pos} y1="0" x2={pos} y2={totalSize} stroke="currentColor" strokeWidth="1" />
+          <line x1="0" y1={pos} x2={totalSize} y2={pos} stroke="currentColor" strokeWidth="1" />
+        </g>
+      );
+    });
+  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
+  const nextDot = puzzleDots[paths.length];
   
   // Rule 4: Fill entire grid with one path - combine all path segments
   const allPathsData = useMemo(() => {
@@ -883,48 +1041,23 @@ export const PuzzleGame: React.FC = () => {
     return getPathData(allCells);
   }, [paths, currentPath, getPathData]);
 
-  // Enhanced live cursor line for smooth pen-like drawing
-  const cursorLineData = useMemo(() => {
-    if (!isDrawing || !cursorPos) return "";
-    
-    if (currentPath.length === 0) {
-      // If no path yet, don't show line (will start when first cell is added)
-      return "";
-    }
-    
-    // Always draw from the last cell in current path to cursor position
-    const lastCell = getCenterOfCell(currentPath[currentPath.length - 1]);
-    
-    // Ensure we have valid coordinates
-    if (!lastCell || !lastCell.x || !lastCell.y || !cursorPos.x || !cursorPos.y) {
-      return "";
-    }
-    
-    return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
-  }, [isDrawing, cursorPos, currentPath, getCenterOfCell]);
-  
-  // Memoized grid lines for better performance
-  const gridLines = useMemo(() => {
-    return Array.from({ length: currentComplexity.gridSize + 1 }).map((_, i) => (
-      <g key={i} className="text-slate-700 pointer-events-none">
-        <line x1={i * currentComplexity.cellSize} y1="0" x2={i * currentComplexity.cellSize} y2={currentComplexity.gridSize * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-        <line x1="0" y1={i * currentComplexity.cellSize} x2={currentComplexity.gridSize * currentComplexity.cellSize} y2={i * currentComplexity.cellSize} stroke="currentColor" strokeWidth="1" />
-      </g>
-    ));
-  }, [currentComplexity.gridSize, currentComplexity.cellSize]);
-
-  const nextDot = puzzleDots[paths.length];
-
-  // Memoized dots rendering for better performance
+  // Memoized dots rendering with reduced re-calculations
   const dotsElements = useMemo(() => {
+    const cellSize = currentComplexity.cellSize;
+    const halfCell = cellSize / 2;
+    
     return puzzleDots.map(({ num, row, col }) => {
-      const isConnected = occupiedCells.has(`${row},${col}`) || currentPath.includes(`${row},${col}`);
+      const cellKey = `${row},${col}`;
+      const isConnected = occupiedCells.has(cellKey) || currentPath.includes(cellKey);
       const isNext = num === nextDot?.num;
       const isStart = num === 1;
       const isEnd = num === puzzleDots.length;
       
+      const x = col * cellSize + halfCell;
+      const y = row * cellSize + halfCell;
+      
       return (
-        <g key={`${puzzleId}-${num}`} transform={`translate(${col * currentComplexity.cellSize + currentComplexity.cellSize / 2}, ${row * currentComplexity.cellSize + currentComplexity.cellSize / 2})`}>
+        <g key={`${puzzleId}-${num}`} transform={`translate(${x}, ${y})`}>
           {/* Special styling for start and end dots */}
           {isStart && (
             <circle r="20" fill="none" stroke="#10b981" strokeWidth="3" opacity="0.6" />
