@@ -25,19 +25,19 @@ export interface ComplexityLevel {
 export const COMPLEXITY_LEVELS: ComplexityLevel[] = [
   // Each stage gets a UNIQUE pattern - ENHANCED COMPLEXITY for challenging progression
   { gridSize: 5, numDots: 4, cellSize: 55, description: "Snake: 4 dots, 5×5 grid", name: "Snake", difficulty: "Easy", patternType: 'simple' },
-  { gridSize: 5, numDots: 5, cellSize: 55, description: "Spiral: 5 dots, 5×5 grid", name: "Spiral", difficulty: "Easy", patternType: 'spiral' },
-  { gridSize: 6, numDots: 5, cellSize: 50, description: "Zigzag: 5 dots, 6×6 grid", name: "Zigzag", difficulty: "Medium", patternType: 'zigzag' },
-  { gridSize: 6, numDots: 6, cellSize: 50, description: "L-Shape: 6 dots, 6×6 grid", name: "L-Shape", difficulty: "Medium", patternType: 'lshape' },
+  { gridSize: 6, numDots: 6, cellSize: 50, description: "Spiral: 6 dots, 6×6 grid", name: "Spiral", difficulty: "Medium", patternType: 'spiral' },
+  { gridSize: 7, numDots: 7, cellSize: 45, description: "Zigzag: 7 dots, 7×7 grid", name: "Zigzag", difficulty: "Medium", patternType: 'zigzag' },
+  { gridSize: 7, numDots: 8, cellSize: 45, description: "L-Shape: 8 dots, 7×7 grid", name: "L-Shape", difficulty: "Hard", patternType: 'lshape' },
   
-  { gridSize: 6, numDots: 7, cellSize: 50, description: "Diamond: 7 dots, 6×6 grid", name: "Diamond", difficulty: "Medium", patternType: 'diamond' },
-  { gridSize: 7, numDots: 6, cellSize: 45, description: "Cross: 6 dots, 7×7 grid", name: "Cross", difficulty: "Medium", patternType: 'cross' },
-  { gridSize: 7, numDots: 7, cellSize: 45, description: "Wave: 7 dots, 7×7 grid", name: "Wave", difficulty: "Hard", patternType: 'wave' },
-  { gridSize: 7, numDots: 8, cellSize: 45, description: "U-Turn: 8 dots, 7×7 grid", name: "U-Turn", difficulty: "Hard", patternType: 'uturn' },
+  { gridSize: 8, numDots: 8, cellSize: 40, description: "Diamond: 8 dots, 8×8 grid", name: "Diamond", difficulty: "Hard", patternType: 'diamond' },
+  { gridSize: 8, numDots: 9, cellSize: 40, description: "Cross: 9 dots, 8×8 grid", name: "Cross", difficulty: "Hard", patternType: 'cross' },
+  { gridSize: 9, numDots: 9, cellSize: 35, description: "Wave: 9 dots, 9×9 grid", name: "Wave", difficulty: "Hard", patternType: 'wave' },
+  { gridSize: 9, numDots: 10, cellSize: 35, description: "U-Turn: 10 dots, 9×9 grid", name: "U-Turn", difficulty: "Very Hard", patternType: 'uturn' },
   
-  { gridSize: 8, numDots: 7, cellSize: 40, description: "Complex: 7 dots, 8×8 grid", name: "Complex", difficulty: "Hard", patternType: 'complex' },
-  { gridSize: 8, numDots: 8, cellSize: 40, description: "Fractal: 8 dots, 8×8 grid", name: "Fractal", difficulty: "Hard", patternType: 'fractal' },
-  { gridSize: 8, numDots: 9, cellSize: 40, description: "Labyrinth: 9 dots, 8×8 grid", name: "Labyrinth", difficulty: "Hard", patternType: 'labyrinth' },
-  { gridSize: 9, numDots: 9, cellSize: 35, description: "Master: 9 dots, 9×9 grid", name: "Master", difficulty: "Hard", patternType: 'maze' },
+  { gridSize: 10, numDots: 10, cellSize: 32, description: "Complex: 10 dots, 10×10 grid", name: "Complex", difficulty: "Very Hard", patternType: 'complex' },
+  { gridSize: 10, numDots: 11, cellSize: 32, description: "Fractal: 11 dots, 10×10 grid", name: "Fractal", difficulty: "Very Hard", patternType: 'fractal' },
+  { gridSize: 11, numDots: 12, cellSize: 30, description: "Labyrinth: 12 dots, 11×11 grid", name: "Labyrinth", difficulty: "Extreme", patternType: 'labyrinth' },
+  { gridSize: 12, numDots: 13, cellSize: 28, description: "Master: 13 dots, 12×12 grid", name: "Master", difficulty: "Extreme", patternType: 'maze' },
 ];
 
 // Enhanced pattern types for game complexity (horizontal/vertical only)
