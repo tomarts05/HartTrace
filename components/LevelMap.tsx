@@ -7,9 +7,10 @@ interface LevelMapProps {
   onLevelSelect: (levelId: number) => void;
   currentLevel: number;
   onClose?: () => void;
+  isOpen?: boolean;
 }
 
-const LevelMap: React.FC<LevelMapProps> = ({ onLevelSelect, currentLevel, onClose }) => {
+const LevelMap: React.FC<LevelMapProps> = ({ onLevelSelect, currentLevel, onClose, isOpen }) => {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const unlockedLevels = progressionManager.getUnlockedLevels();
 
