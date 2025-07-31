@@ -34,6 +34,8 @@ export const PuzzleGame: React.FC = () => {
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
   const performanceMode = getPerformanceMode();
+  const updateThrottle = performanceMode === 'low' ? 100 : performanceMode === 'medium' ? 66 : 33;
+  const lastUpdateRef = useRef(0);
   
   // Enhanced performance caching for coordinate transformations
   const coordinateTransformCacheRef = useRef<{
@@ -58,64 +60,6 @@ export const PuzzleGame: React.FC = () => {
     needsUpdate: false
   });
   
-  // Enhanced coordinate transformation functions
-  const getCachedSVGRect = useCallback(() => {
-    if (!svgRef.current) return null;
-    
-    const now = performance.now();
-    const cache = coordinateTransformCacheRef.current;
-    
-    if (cache && (now - cache.timestamp) < COORDINATE_CACHE_DURATION) {
-      return cache;
-    }
-    
-    const rect = svgRef.current.getBoundingClientRect();
-    const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
-    const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
-    
-    const newCache = {
-      svgWidth,
-      svgHeight,
-      rect,
-      scaleX: svgWidth / rect.width,
-      scaleY: svgHeight / rect.height,
-      timestamp: now
-    };
-    
-    coordinateTransformCacheRef.current = newCache;
-    return newCache;
-  }, [currentComplexity]);
-
-  // Enhanced cell position caching
-  const getCachedCellPositions = useCallback(() => {
-    if (cellCacheValidRef.current && cellPositionCacheRef.current.size > 0) {
-      return cellPositionCacheRef.current;
-    }
-    
-    const positions = new Map<string, { x: number; y: number }>();
-    const cellSize = currentComplexity.cellSize;
-    
-    for (let row = 0; row < currentComplexity.gridSize; row++) {
-      for (let col = 0; col < currentComplexity.gridSize; col++) {
-        const cell = `${row},${col}`;
-        positions.set(cell, {
-          x: col * cellSize + cellSize / 2,
-          y: row * cellSize + cellSize / 2
-        });
-      }
-    }
-    
-    cellPositionCacheRef.current = positions;
-    cellCacheValidRef.current = true;
-    return positions;
-  }, [currentComplexity]);
-
-  // Clear cell cache when complexity changes
-  useEffect(() => {
-    cellCacheValidRef.current = false;
-    cellPositionCacheRef.current.clear();
-  }, [currentComplexity]);
-
   // Facebook Instant Games integration
   const [fbState, fbActions] = useFBInstant();
   
@@ -182,6 +126,93 @@ export const PuzzleGame: React.FC = () => {
   const currentComplexity = COMPLEXITY_LEVELS[complexityLevel];
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
   const occupiedCells = useMemo(() => new Set(paths.flatMap(p => p.cells)), [paths]);
+
+  // Enhanced coordinate transformation functions (moved here after currentComplexity is available)
+  const getCachedSVGRect = useCallback(() => {
+    if (!svgRef.current) return null;
+    
+    const now = performance.now();
+    const cache = coordinateTransformCacheRef.current;
+    
+    if (cache && (now - cache.timestamp) < COORDINATE_CACHE_DURATION) {
+      return cache;
+    }
+    
+    const rect = svgRef.current.getBoundingClientRect();
+    const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
+    const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
+    
+    const newCache = {
+      svgWidth,
+      svgHeight,
+      rect,
+      scaleX: svgWidth / rect.width,
+      scaleY: svgHeight / rect.height,
+      timestamp: now
+    };
+    
+    coordinateTransformCacheRef.current = newCache;
+    return newCache;
+  }, [currentComplexity]);
+
+  // Enhanced cell position caching
+  const getCachedCellPositions = useCallback(() => {
+    if (cellCacheValidRef.current && cellPositionCacheRef.current.size > 0) {
+      return cellPositionCacheRef.current;
+    }
+    
+    const positions = new Map<string, { x: number; y: number }>();
+    const cellSize = currentComplexity.cellSize;
+    
+    for (let row = 0; row < currentComplexity.gridSize; row++) {
+      for (let col = 0; col < currentComplexity.gridSize; col++) {
+        const cell = `${row},${col}`;
+        positions.set(cell, {
+          x: col * cellSize + cellSize / 2,
+          y: row * cellSize + cellSize / 2
+        });
+      }
+    }
+    
+    cellPositionCacheRef.current = positions;
+    cellCacheValidRef.current = true;
+    return positions;
+  }, [currentComplexity]);
+
+  // Performance-optimized coordinate transformation with caching
+  const getCachedCoordinateTransform = useCallback(() => {
+    if (!svgRef.current) return null;
+    
+    const now = performance.now();
+    const cache = coordinateTransformCacheRef.current;
+    
+    // Use cached transform if it's fresh
+    if (cache && (now - cache.timestamp) < COORDINATE_CACHE_DURATION) {
+      return cache;
+    }
+    
+    // Calculate fresh transform and cache it
+    const rect = getCachedSVGRect();
+    if (!rect || rect.svgWidth === 0 || rect.svgHeight === 0) return null;
+    
+    const transform = {
+      svgWidth: rect.svgWidth,
+      svgHeight: rect.svgHeight,
+      rect: rect.rect,
+      scaleX: rect.scaleX,
+      scaleY: rect.scaleY,
+      timestamp: now
+    };
+    
+    coordinateTransformCacheRef.current = transform;
+    return transform;
+  }, [getCachedSVGRect]);
+
+  // Clear cell cache when complexity changes
+  useEffect(() => {
+    cellCacheValidRef.current = false;
+    cellPositionCacheRef.current.clear();
+  }, [currentComplexity]);
 
   // Timer system
   useEffect(() => {
