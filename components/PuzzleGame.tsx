@@ -9,9 +9,8 @@ import soundManager from '../utils/soundManager';
 import { triggerVictoryConfetti, PulseEffect } from '../utils/visualEffects';
 import progressionManager from '../utils/progressionManager';
 import LevelMap from './LevelMap';
-import AchievementsModal from './AchievementsModal';
 
-// Enhanced modules
+// Enhanced modules (keep for backend improvements only)
 import GameEngine, { GameConfiguration, FeedbackGrade } from '../utils/gameEngine';
 import PatternGenerator from '../utils/patternGenerator';
 import InputHandler from '../utils/inputHandler';
@@ -92,105 +91,30 @@ export const PuzzleGame: React.FC = () => {
     return initialPuzzleState.dots;
   });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [showTip, setShowTip] = useState(false);
-  const [solutionPath, setSolutionPath] = useState<string[]>([]);
   const [validatedSolution, setValidatedSolution] = useState<string[]>(initialPuzzleState.solution); // Store the validated solution from puzzle generation
   const [pathHistory, setPathHistory] = useState<Path[][]>([]); // Store history of path states for undo
   const [redoHistory, setRedoHistory] = useState<Path[][]>([]); // Store history of path states for redo
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  // Enhanced features state
   const [showLevelMap, setShowLevelMap] = useState(false);
-  const [showAchievements, setShowAchievements] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(!soundManager.isSoundMuted());
+  const svgRef = useRef<SVGSVGElement>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [moveCount, setMoveCount] = useState(0);
   const [showVictoryEffect, setShowVictoryEffect] = useState(false);
   const [globalTimer, setGlobalTimer] = useState(0); // Track total play time
-  
-  // Enhanced game systems
-  const [gameEngine] = useState(() => new GameEngine());
-  const [patternGenerator] = useState(() => PatternGenerator.getInstance());
-  const [inputHandler] = useState(() => new InputHandler());
-  const [feedbackRenderer] = useState(() => new FeedbackRenderer());
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [currentGrade, setCurrentGrade] = useState<FeedbackGrade | null>(null);
-  const [offlineStatus, setOfflineStatus] = useState(false);
   
   // Initialize sound system
   useEffect(() => {
     soundManager.preloadSounds();
   }, []);
   
-  // Initialize enhanced game systems
+  // Initialize background enhancements (service worker)
   useEffect(() => {
-    // Initialize service worker
+    // Initialize service worker for offline support (backend improvement)
     serviceWorkerManager.register().then(success => {
       if (success) {
         console.log('✅ Service Worker initialized successfully');
       }
     });
-
-    // Setup service worker callbacks
-    serviceWorkerManager.onOfflineStatusChange((isOffline) => {
-      setOfflineStatus(isOffline);
-      if (isOffline) {
-        feedbackRenderer.showQuickFeedback('📴 You are now offline', 'info');
-      } else {
-        feedbackRenderer.showQuickFeedback('📶 Back online!', 'success');
-      }
-    });
-
-    // Setup game engine callbacks
-    gameEngine.setTimerCallbacks(
-      (timeLeft) => {
-        setTimeRemaining(timeLeft);
-        
-        // Show warnings at critical times
-        if (timeLeft === 30) {
-          feedbackRenderer.showTimeWarning(timeLeft, false);
-        } else if (timeLeft === 10) {
-          feedbackRenderer.showTimeWarning(timeLeft, true);
-        }
-      },
-      () => {
-        // Time expired
-        feedbackRenderer.showQuickFeedback('⏰ Time is up! Try again!', 'error');
-        setGameState(GAME_STATE.IDLE);
-      }
-    );
-
-    // Setup input handler callbacks
-    inputHandler.setCallbacks(
-      (cell) => {
-        // Valid move made
-        if (soundEnabled) {
-          soundManager.playClick();
-        }
-        inputHandler.triggerHapticFeedback('light');
-      },
-      (reason) => {
-        // Invalid move
-        feedbackRenderer.showQuickFeedback(reason, 'error');
-        if (soundEnabled) {
-          soundManager.playError?.();
-        }
-        inputHandler.triggerHapticFeedback('medium');
-      },
-      (drawingState) => {
-        // Drawing state changed
-        setCurrentPath(drawingState.currentPath);
-        setIsDrawing(drawingState.isDrawing);
-      }
-    );
-
-    return () => {
-      // Cleanup
-      gameEngine.stopGame();
-      inputHandler.reset();
-      feedbackRenderer.clearAllFeedback();
-    };
-  }, [soundEnabled]);
+  }, []);
   
   // Initialize progression from saved state
   useEffect(() => {
@@ -204,23 +128,8 @@ export const PuzzleGame: React.FC = () => {
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
   const occupiedCells = useMemo(() => new Set(paths.flatMap(p => p.cells)), [paths]);
 
-  // Enhanced timer system using GameEngine
+  // Timer system
   useEffect(() => {
-    if (gameState === GAME_STATE.PLAYING) {
-      // Start game engine timer with progressive difficulty
-      const optimalMoveCount = totalCells; // Estimate optimal moves
-      gameEngine.startLevel(complexityLevel + 1, optimalMoveCount);
-      
-      // Set input tolerance based on level
-      const tolerance = gameEngine.getInputTolerance();
-      inputHandler.setTolerance(tolerance);
-      
-      console.log(`🎮 Started level ${complexityLevel + 1} with ${tolerance}px tolerance`);
-    } else {
-      gameEngine.stopGame();
-    }
-    
-    // Legacy timer for backward compatibility
     let interval: number;
     if (gameState === GAME_STATE.PLAYING) {
       interval = window.setInterval(() => {
@@ -229,17 +138,10 @@ export const PuzzleGame: React.FC = () => {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [gameState, complexityLevel, totalCells]);
+  }, [gameState]);
 
   const resetGame = useCallback(() => {
     console.log('🔄 RESET: Generating new puzzle...');
-    
-    // Stop and reset enhanced game systems
-    gameEngine.stopGame();
-    inputHandler.reset();
-    feedbackRenderer.clearAllFeedback();
-    setCurrentGrade(null);
-    setTimeRemaining(0);
     
     // Generate NEW random dots WITH validated solution
     const puzzleResult = generateRandomDotsWithSolution(currentComplexity);
@@ -252,35 +154,34 @@ export const PuzzleGame: React.FC = () => {
     setCursorPos(null);
     setTimer(0);
     setGameState(GAME_STATE.IDLE);
-    setShowTip(false);
-    setSolutionPath([]);
     setValidatedSolution(puzzleResult.solution); // Store the EXACT validated solution
-    setPathHistory([]); // Clear undo history
-    setRedoHistory([]); // Clear redo history
     setPuzzleDots(puzzleResult.dots); // Use the validated dots
     setPuzzleId(prev => prev + 1); // Force re-render with new puzzle ID
     setMoveCount(0);
     setStartTime(Date.now());
     setShowVictoryEffect(false);
     
-    // Play reset sound
-    if (soundEnabled) {
+    // Play reset sound if sound system is available
+    if (soundManager && !soundManager.isSoundMuted()) {
       soundManager.playClick();
     }
     
     console.log('🔄 RESET: State updated with new dots');
-  }, [currentComplexity, soundEnabled, gameEngine, inputHandler, feedbackRenderer]);
+  }, [currentComplexity]);
 
   const showNotification = useCallback((message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000); // Auto-hide after 3 seconds
   }, []);
 
-  // Save current state to history (called before making changes)
-  const saveToHistory = useCallback(() => {
-    setPathHistory(prev => [...prev, [...paths]]);
-    setRedoHistory([]); // Clear redo history when new action is taken
-    console.log('Saved state to history. Paths count:', paths.length);
+  // Save path state to history for undo functionality
+  useEffect(() => {
+    // Only save to history if we have actual paths and we're not in the middle of an undo/redo operation
+    if (paths.length >= 0) {
+      setPathHistory(prev => [...prev, [...paths]]);
+      setRedoHistory([]); // Clear redo history when new action is taken
+      console.log('Saved state to history. Paths count:', paths.length);
+    }
   }, [paths]);
 
   const undoLastPath = useCallback(() => {
@@ -302,8 +203,6 @@ export const PuzzleGame: React.FC = () => {
     
     // Restore previous state
     setPaths(previousState);
-    
-    // Clear current drawing path
     setCurrentPath([]);
     setIsDrawing(false);
     setCursorPos(null);
@@ -333,8 +232,6 @@ export const PuzzleGame: React.FC = () => {
     
     // Restore next state
     setPaths(nextState);
-    
-    // Clear current drawing path
     setCurrentPath([]);
     setIsDrawing(false);
     setCursorPos(null);
@@ -361,151 +258,6 @@ export const PuzzleGame: React.FC = () => {
     
     return -1; // No more dots found
   }, []);
-
-  const showTipHandler = useCallback(() => {
-    if (gameState === GAME_STATE.WON) return;
-    
-    console.log('💡 TIP REQUESTED: Using validated solution...');
-    console.log('Validated solution length:', validatedSolution?.length || 0);
-    console.log('Current paths:', paths.length);
-    console.log('Current path length:', currentPath.length);
-    
-    fbActions.logEvent('tip_requested', 1, { stage: complexityLevel + 1 });
-    
-    // Use the VALIDATED solution from puzzle generation
-    if (!validatedSolution || validatedSolution.length === 0) {
-      console.log('❌ TIP FAILED: No validated solution available');
-      showNotification('🚨 No solution available! Click "New" to generate a new puzzle.', 'info');
-      return;
-    }
-    
-    const fullSolution = validatedSolution;
-    const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
-    
-    console.log('✅ TIP SUCCESS: Using validated solution with', fullSolution.length, 'cells');
-    console.log('Expected total cells:', totalCells);
-    
-    if (fullSolution.length !== totalCells) {
-      console.log('⚠️ WARNING: Solution length mismatch!');
-      showNotification('⚠️ Puzzle solution issue! Click "New" to generate a fresh puzzle.', 'info');
-      return;
-    }
-    
-    // Calculate what cells are already filled by current paths
-    const filledCells = new Set<string>();
-    paths.forEach(path => {
-      path.cells.forEach(cell => filledCells.add(cell));
-    });
-    currentPath.forEach(cell => filledCells.add(cell));
-    
-    console.log('Already filled cells count:', filledCells.size);
-    
-    // Find where we are in the solution and show meaningful segments
-    let tipPath: string[] = [];
-    let startIndex = 0;
-    
-    if (filledCells.size === 0) {
-      // No progress yet - show from start to first or second dot
-      const firstDot = puzzleDots.find(dot => dot.num === 1);
-      const secondDot = puzzleDots.find(dot => dot.num === 2);
-      
-      if (firstDot && secondDot) {
-        const firstDotCell = `${firstDot.row},${firstDot.col}`;
-        const secondDotCell = `${secondDot.row},${secondDot.col}`;
-        const firstDotIndex = fullSolution.indexOf(firstDotCell);
-        const secondDotIndex = fullSolution.indexOf(secondDotCell);
-        
-        if (firstDotIndex >= 0 && secondDotIndex > firstDotIndex) {
-          // Show path to second dot plus some more
-          const endIndex = Math.min(secondDotIndex + 8, fullSolution.length);
-          tipPath = fullSolution.slice(0, endIndex);
-          console.log('🔰 No progress - showing path to second dot + more:', tipPath.length, 'cells');
-        }
-      }
-      
-      if (tipPath.length === 0) {
-        // Fallback: show first 15-20 steps
-        tipPath = fullSolution.slice(0, Math.min(20, fullSolution.length));
-        console.log('🔰 No progress - showing first steps:', tipPath.length, 'cells');
-      }
-    } else {
-      // Find the furthest point in the solution that matches our progress
-      let lastMatchIndex = -1;
-      for (let i = 0; i < fullSolution.length; i++) {
-        if (filledCells.has(fullSolution[i])) {
-          lastMatchIndex = i;
-        }
-      }
-      
-      if (lastMatchIndex >= 0) {
-        console.log('📍 Found progress up to solution index:', lastMatchIndex);
-        
-        // Find the next dot we need to reach
-        const nextDotIndex = findNextDotInSolution(fullSolution, lastMatchIndex, puzzleDots);
-        
-        if (nextDotIndex >= 0) {
-          // Show path from current position to next dot plus more steps beyond
-          startIndex = lastMatchIndex + 1;
-          const endIndex = Math.min(nextDotIndex + 15, fullSolution.length);
-          tipPath = fullSolution.slice(startIndex, endIndex);
-          console.log(`📍 Showing path from index ${startIndex} to next dot + more:`, tipPath.length, 'cells');
-        } else {
-          // No more dots - show remaining path for completion
-          startIndex = lastMatchIndex + 1;
-          const endIndex = Math.min(startIndex + 25, fullSolution.length);
-          tipPath = fullSolution.slice(startIndex, endIndex);
-          console.log(`📍 Showing final completion path:`, tipPath.length, 'cells');
-        }
-      } else {
-        // Current path doesn't match solution - show corrective guidance
-        const firstDot = puzzleDots.find(dot => dot.num === 1);
-        if (firstDot) {
-          const firstDotCell = `${firstDot.row},${firstDot.col}`;
-          const firstDotIndex = fullSolution.indexOf(firstDotCell);
-          if (firstDotIndex >= 0) {
-            tipPath = fullSolution.slice(0, Math.min(firstDotIndex + 12, fullSolution.length));
-            console.log('⚠️ Path mismatch - showing correct path:', tipPath.length, 'cells');
-          }
-        }
-      }
-    }
-    
-    if (tipPath.length === 0) {
-      console.log('🎉 TIP: You\'re already at the end or very close!');
-      showNotification('🎉 You\'re very close to completion!', 'info');
-      return;
-    }
-    
-    // Show the tip with enhanced messaging
-    setSolutionPath(tipPath);
-    setShowTip(true);
-    
-    // Create a more informative tip message
-    let tipMessage = '💡 Tip: Follow the yellow path!';
-    if (filledCells.size === 0) {
-      tipMessage = `💡 Tip: Start from dot 1 and follow the yellow path to dot 2!`;
-    } else {
-      const nextDotNum = paths.length + 2; // Next dot we need to reach
-      if (nextDotNum <= puzzleDots.length) {
-        tipMessage = `💡 Tip: Follow the yellow path to reach dot ${nextDotNum}!`;
-      } else {
-        tipMessage = `💡 Tip: Follow the yellow path to complete the puzzle!`;
-      }
-    }
-    
-    showNotification(tipMessage, 'info');
-    
-    console.log('💡 TIP ACTIVE: Solution path set, showing', tipPath.length, 'cells');
-    console.log('💡 First 3 cells:', tipPath.slice(0, 3));
-    console.log('💡 Last 3 cells:', tipPath.slice(-3));
-    
-    // Hide tip after 15 seconds (increased for better usability)
-    setTimeout(() => {
-      console.log('💡 TIP TIMEOUT: Hiding tip after 15 seconds');
-      setShowTip(false);
-      setSolutionPath([]);
-    }, 15000);
-  }, [gameState, validatedSolution, paths, currentPath, fbActions, complexityLevel, showNotification, puzzleDots, findNextDotInSolution, currentComplexity]);
 
   const advanceToNextLevel = useCallback(() => {
     const nextLevel = Math.min(complexityLevel + 1, COMPLEXITY_LEVELS.length - 1);
@@ -541,45 +293,10 @@ export const PuzzleGame: React.FC = () => {
       setCursorPos(null);
       setTimer(0);
       setGameState(GAME_STATE.IDLE);
-      setShowTip(false);
-      setSolutionPath([]);
-      setPathHistory([]); // Clear undo history
       
       console.log('Advanced to next level successfully');
     }, 1000); // 1 second delay to show notification
   }, [complexityLevel, showNotification]);
-
-  const startNewGame = useCallback(() => {
-    console.log('🎲 NEW GAME: Starting for level', complexityLevel);
-    
-    fbActions.logEvent('new_game_started', 1, { stage: complexityLevel + 1 });
-    
-    // Generate NEW random dots WITH validated solution
-    const puzzleResult = generateRandomDotsWithSolution(currentComplexity);
-    console.log('🎲 NEW GAME: Generated puzzle:', puzzleResult);
-    console.log('🎲 NEW GAME: Dot positions:', puzzleResult.dots.map(d => `${d.num}: (${d.row},${d.col})`));
-    console.log('🎲 NEW GAME: Solution length:', puzzleResult.solution.length);
-    
-    // Set the puzzle dots FIRST, then reset the game
-    setPuzzleDots(puzzleResult.dots);
-    setValidatedSolution(puzzleResult.solution); // Store the validated solution
-    setPuzzleId(prev => prev + 1); // Force re-render with new puzzle ID
-    
-    // Clear all game state
-    setPaths([]);
-    setCurrentPath([]);
-    setIsDrawing(false);
-    setCursorPos(null);
-    setTimer(0);
-    setGameState(GAME_STATE.IDLE);
-    setShowTip(false);
-    setSolutionPath([]);
-    setPathHistory([]);
-    setRedoHistory([]);
-    
-    showNotification(`🎲 New Stage ${complexityLevel + 1} puzzle generated!`, 'info');
-    console.log('🎲 NEW GAME: Complete!');
-  }, [currentComplexity, complexityLevel, showNotification, fbActions]);
 
   // Optimized coordinate calculation with enhanced caching
   const getCachedSVGRect = useCallback(() => {
@@ -743,12 +460,6 @@ export const PuzzleGame: React.FC = () => {
       const lastCell = currentPath[currentPath.length - 1];
       if (cell === lastCell) {
         console.log('Continuing from last cell of current path');
-        // Clear tip when actually starting to draw
-        if (showTip) {
-          setShowTip(false);
-          setSolutionPath([]);
-          console.log('Cleared tip on drawing start');
-        }
         setIsDrawing(true);
         return;
       }
@@ -765,18 +476,12 @@ export const PuzzleGame: React.FC = () => {
       // Rule 5: Path cannot cross itself
       if (isAdjacent && !currentPath.includes(cell) && !occupiedCells.has(cell)) {
         console.log('Continuing path from adjacent cell');
-        // Clear tip when actually starting to draw
-        if (showTip) {
-          setShowTip(false);
-          setSolutionPath([]);
-          console.log('Cleared tip on drawing continuation');
-        }
         setIsDrawing(true);
         setCurrentPath(prev => [...prev, cell]);
         setMoveCount(prev => prev + 1);
         
-        // Play drawing sound
-        if (soundEnabled) {
+        // Play drawing sound if available
+        if (soundManager && !soundManager.isSoundMuted()) {
           soundManager.playDraw();
         }
         return;
@@ -786,22 +491,14 @@ export const PuzzleGame: React.FC = () => {
     // For new paths, ensure we start at the next dot (Rule 3: ascending order)
     if (cell === startDotCell) {
       console.log('Starting to draw from dot', nextDotNumber, 'at cell', cell);
-      // Clear tip when actually starting to draw
-      if (showTip) {
-        setShowTip(false);
-        setSolutionPath([]);
-        console.log('Cleared tip on new path start');
-      }
-      // Clear redo history when starting a new action
-      setRedoHistory([]);
       
       // Immediately set up drawing state for better responsiveness
       setCurrentPath([startDotCell]); // Always start with the dot cell
       setIsDrawing(true);
       setMoveCount(prev => prev + 1);
       
-      // Play click sound
-      if (soundEnabled) {
+      // Play click sound if available
+      if (soundManager && !soundManager.isSoundMuted()) {
         soundManager.playClick();
       }
       
@@ -831,7 +528,7 @@ export const PuzzleGame: React.FC = () => {
       console.log('Must start from dot', nextDotNumber, 'at cell', startDotCell);
       showNotification(`Start from dot ${nextDotNumber} or continue your current path`, 'info');
     }
-  }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showTip, showNotification, currentPath]);
+  }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showNotification, currentPath]);
   
   // Add a batch update function using requestAnimationFrame
   const batchedStateUpdateRef = useRef<{
@@ -947,12 +644,6 @@ export const PuzzleGame: React.FC = () => {
     // Add the cell to the current path
     const newCurrentPath = [...currentPath, cell];
     setCurrentPath(newCurrentPath);
-    
-    // Clear tip when actually adding to path (making real progress)
-    if (showTip || solutionPath.length > 0) {
-      setShowTip(false);
-      setSolutionPath([]);
-    }
 
     // Check if we've reached a numbered dot (Rule 3: Visit numbered cells in ascending order)
     const currentDotNum = paths.length + 1;
@@ -962,9 +653,6 @@ export const PuzzleGame: React.FC = () => {
     // If we're on a dot cell and it's the next dot in sequence
     if (nextDot && cell === `${nextDot.row},${nextDot.col}`) {
       console.log(`Reached dot ${nextDotNum} at cell ${cell}`);
-      
-      // Save current state to history before adding new path
-      saveToHistory();
       
       // Complete the current path to this dot
       const newPath: Path = { from: currentDotNum, to: nextDotNum, cells: [...newCurrentPath] };
@@ -1079,10 +767,6 @@ export const PuzzleGame: React.FC = () => {
     getCellFromEvent, 
     paths, 
     puzzleDots, 
-    showTip, 
-    setSolutionPath, 
-    setShowTip, 
-    saveToHistory, 
     currentComplexity.gridSize,
     totalCells,
     fbActions.logEvent,
@@ -1120,29 +804,6 @@ export const PuzzleGame: React.FC = () => {
   }, [handleInteractionMove, handleInteractionEnd]);
 
   // Keyboard shortcuts for undo/redo
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (gameState === GAME_STATE.WON) return;
-      
-      // Ctrl+Z for undo
-      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undoLastPath();
-      }
-      
-      // Ctrl+Y or Ctrl+Shift+Z for redo
-      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
-        e.preventDefault();
-        redoLastPath();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [gameState, undoLastPath, redoLastPath]);
-
   // Optimized path data generation with pre-calculated cell positions
   const getPathData = useCallback((cells: string[]) => {
     if (cells.length === 0) return "";
@@ -1355,62 +1016,29 @@ export const PuzzleGame: React.FC = () => {
     if (allDotsConnected && allCellsFilled) {
       console.log('🎉 WIN CONDITION TRIGGERED by useEffect!');
       
-      // Stop game engine and calculate grade
-      gameEngine.stopGame();
-      const stats = gameEngine.getStats();
-      const pathAccuracy = inputHandler.calculatePathAccuracy();
-      const grade = gameEngine.calculateGrade(totalCells, pathAccuracy);
-      
-      console.log('📊 Game completion stats:', { stats, grade, pathAccuracy });
-      
-      // Store grade for display
-      setCurrentGrade(grade);
-      
-      // Show enhanced feedback
-      feedbackRenderer.showScoreDisplay({
-        grade,
-        stats,
-        showBreakdown: true,
-        animations: {
-          scoreReveal: { type: 'slide', duration: 500, easing: 'ease-out' },
-          gradeReveal: { type: 'bounce', duration: 600, easing: 'ease-out' },
-          bonusReveal: { type: 'pulse', duration: 400, easing: 'ease-out' }
-        }
-      });
-      
-      // Log completion event to Facebook with enhanced data
+      // Log completion event to Facebook
       fbActions.logEvent('stage_completed', complexityLevel + 1, {
         stage: complexityLevel + 1,
         time: timer,
         paths: paths.length,
-        complexity: currentComplexity.description,
-        grade: grade.grade,
-        score: grade.score,
-        efficiency: stats.efficiency,
-        accuracy: pathAccuracy
+        complexity: currentComplexity.description
       });
       
-      // Submit enhanced score to leaderboard if in Facebook
+      // Submit score to leaderboard if in Facebook
       if (fbState.isInitialized) {
-        const enhancedScore = Math.max(1, grade.score * 100 + (10000 - timer * 10));
-        fbActions.submitScore('main_leaderboard', enhancedScore, {
+        const score = Math.max(1, 10000 - timer * 10);
+        fbActions.submitScore('main_leaderboard', score, {
           stage: complexityLevel + 1,
           time: timer,
-          complexity: currentComplexity.description,
-          grade: grade.grade,
-          efficiency: stats.efficiency.toFixed(1)
+          complexity: currentComplexity.description
         });
       }
       
-      // Legacy notification for compatibility
-      showNotification(`🎉 ${grade.grade}! Stage ${complexityLevel + 1} Complete!`, 'success');
+      showNotification(`🎉 Puzzle Solved! Stage ${complexityLevel + 1} Complete!`, 'success');
       setGameState(GAME_STATE.WON);
       setCurrentPath([]);
       setIsDrawing(false);
       setCursorPos(null);
-      
-      // Reset input handler for next level
-      inputHandler.reset();
     }
   }, [paths, currentPath, gameState, puzzleDots.length, totalCells, complexityLevel, timer, currentComplexity, fbActions, fbState, showNotification]);
 
@@ -1445,28 +1073,29 @@ export const PuzzleGame: React.FC = () => {
     }
   }, [puzzleDots, validatedSolution, complexityLevel, currentComplexity]);
 
-  // Test function to validate current generation
-  const testCurrentGeneration = useCallback(() => {
-    console.log('🧪 TESTING CURRENT GENERATION...');
-    
-    for (let i = 0; i < Math.min(5, COMPLEXITY_LEVELS.length); i++) {
-      const complexity = COMPLEXITY_LEVELS[i];
-      console.log(`\n--- Testing Stage ${i + 1}: ${complexity.description} ---`);
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameState === GAME_STATE.WON) return;
       
-      const result = generateRandomDotsWithSolution(complexity);
-      
-      console.log(`Generated ${result.dots.length} dots:`, result.dots.map(d => `${d.num}:(${d.row},${d.col})`));
-      console.log(`Solution length: ${result.solution.length}/${complexity.gridSize * complexity.gridSize}`);
-      
-      if (result.solution.length === complexity.gridSize * complexity.gridSize) {
-        console.log('✅ Stage', i + 1, 'generation: SUCCESS');
-      } else {
-        console.log('❌ Stage', i + 1, 'generation: FAILED');
+      // Ctrl+Z for undo
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undoLastPath();
       }
-    }
-    
-    showNotification('🧪 Generation test complete! Check console for results.', 'info');
-  }, [showNotification]);
+      
+      // Ctrl+Y or Ctrl+Shift+Z for redo
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
+        e.preventDefault();
+        redoLastPath();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [gameState, undoLastPath, redoLastPath]);
 
   return (
     <div 
@@ -1506,22 +1135,14 @@ export const PuzzleGame: React.FC = () => {
               )}
             </div>
             
-            {/* Enhanced Timer and Stats - Compact on Mobile */}
+            {/* Timer and Stats - Compact on Mobile */}
             <div className="timer-container">
               <ClockIcon className="icon-base"/>
-              <span className={`timer-time ${timeRemaining > 0 && timeRemaining <= 30 ? 'timer-warning' : ''} ${timeRemaining > 0 && timeRemaining <= 10 ? 'timer-critical' : ''}`}>
-                {new Date(timer * 1000).toISOString().substr(14, 5)}
-                {timeRemaining > 0 && gameEngine.shouldApplyTimePressure() && (
-                  <span className="time-limit">/{Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}</span>
-                )}
-              </span>
+              <span className="timer-time">{new Date(timer * 1000).toISOString().substr(14, 5)}</span>
               <span className="move-counter">• {moveCount} moves</span>
-              {offlineStatus && (
-                <span className="offline-indicator">📴</span>
-              )}
             </div>
           </div>
-          {/* Controls - Mobile Optimized Grid */}
+          {/* Controls - 4 Main Buttons */}
           <div className="controls-grid">
             <button onClick={resetGame} className="control-button reset">
                 <ReplayIcon className="icon-sm" />
@@ -1530,58 +1151,11 @@ export const PuzzleGame: React.FC = () => {
             </button>
             <button 
               onClick={undoLastPath}
-              disabled={paths.length === 0}
-              className={`control-button ${paths.length === 0 ? 'undo disabled' : 'undo'}`}
+              disabled={pathHistory.length === 0}
+              className={`control-button ${pathHistory.length === 0 ? 'undo disabled' : 'undo'}`}
             >
                 <span className="text-xs">🔙</span>
                 <span className="hidden-sm">Undo</span>
-            </button>
-            <button 
-              onClick={redoLastPath}
-              disabled={redoHistory.length === 0}
-              className={`control-button ${redoHistory.length === 0 ? 'redo disabled' : 'redo'}`}
-            >
-                <span className="text-xs">🔄</span>
-                <span className="hidden-sm">Redo</span>
-            </button>
-            <button 
-              onClick={() => setShowLevelMap(true)}
-              className="control-button level-map"
-            >
-                <span className="text-xs">🗺️</span>
-                <span className="hidden-sm">Levels</span>
-            </button>
-            <button 
-              onClick={() => setShowAchievements(true)}
-              className="control-button achievements"
-            >
-                <span className="text-xs">🏆</span>
-                <span className="hidden-sm">Awards</span>
-            </button>
-            <button 
-              onClick={() => {
-                const newSoundEnabled = soundManager.toggleMute();
-                setSoundEnabled(!newSoundEnabled);
-              }}
-              className={`control-button sound ${soundEnabled ? 'enabled' : 'disabled'}`}
-            >
-                <span className="text-xs">{soundEnabled ? '🔊' : '🔇'}</span>
-                <span className="hidden-sm">Sound</span>
-            </button>
-            <button 
-              onClick={startNewGame}
-              className="control-button new"
-            >
-                <span className="text-xs">🎲</span>
-                <span className="hidden-sm">New</span>
-            </button>
-            <button 
-              onClick={showTipHandler}
-              disabled={gameState === GAME_STATE.WON}
-              className={`control-button ${gameState === GAME_STATE.WON ? 'tip disabled' : 'tip'}`}
-            >
-                <span className="text-xs">💡</span>
-                <span className="hidden-sm">Tip</span>
             </button>
             <button 
               onClick={() => {
@@ -1595,15 +1169,14 @@ export const PuzzleGame: React.FC = () => {
               className="control-button reset-progress"
             >
                 <span className="text-xs">🔄</span>
-                <span>Reset Progress</span>
+                <span className="hidden-sm">Reset All</span>
             </button>
             <button 
-              onClick={testCurrentGeneration}
-              className="control-button"
-              style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+              onClick={() => setShowLevelMap(true)}
+              className="control-button level-map"
             >
-                <span className="text-xs">🧪</span>
-                <span>Test Gen</span>
+                <span className="text-xs">🗺️</span>
+                <span className="hidden-sm">Progress</span>
             </button>
           </div>
         </div>
@@ -1682,47 +1255,6 @@ export const PuzzleGame: React.FC = () => {
                   />
                 </g>
               )}
-              
-              {/* Tip/Solution path - enhanced visibility with animation */}
-              {showTip && solutionPath.length > 0 && (
-                <g>
-                  {/* Background glow for tip path */}
-                  <path 
-                    d={getPathData(solutionPath)} 
-                    stroke="#fbbf24" 
-                    strokeWidth="16" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    fill="none" 
-                    opacity="0.3"
-                    strokeDasharray="20,15"
-                    className="animate-enhanced-pulse"
-                  />
-                  {/* Main tip path */}
-                  <path 
-                    d={getPathData(solutionPath)} 
-                    stroke="#fbbf24" 
-                    strokeWidth="10" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    fill="none" 
-                    opacity="0.9"
-                    strokeDasharray="15,10"
-                  />
-                  {/* Animated overlay for movement effect */}
-                  <path 
-                    d={getPathData(solutionPath)} 
-                    stroke="#ffffff" 
-                    strokeWidth="6" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    fill="none" 
-                    opacity="0.6"
-                    strokeDasharray="8,12"
-                    className="tip-path-animated"
-                  />
-                </g>
-              )}
             </g>
             
             {/* Dots - Memoized for performance */}
@@ -1750,8 +1282,6 @@ export const PuzzleGame: React.FC = () => {
             Connect dots <span className="instructions-start">1 (START)</span> to <span className="instructions-end">{puzzleDots[puzzleDots.length - 1].num} (END)</span>
             <br className="hidden-sm" />
             <span className="sm:hidden"> • </span>Fill every cell to win!
-            <br />
-            <span className="instructions-tip">💡 Tap Undo/Redo or use Ctrl+Z/Y</span>
             {/* Debug info - Remove in production */}
             <br />
             <span style={{ fontSize: '10px', color: '#666' }}>
@@ -1828,10 +1358,10 @@ export const PuzzleGame: React.FC = () => {
                 )}
                 
                 <button 
-                  onClick={startNewGame}
+                  onClick={resetGame}
                   className="victory-button new"
                 >
-                  🎲 New Stage {complexityLevel + 1}
+                  🔄 New Puzzle
                 </button>
                 
                 <button 
@@ -1868,26 +1398,17 @@ export const PuzzleGame: React.FC = () => {
       <AnimatePresence>
         {showLevelMap && (
           <LevelMap
-            onLevelSelect={(levelId) => {
-              setComplexityLevel(levelId);
-              progressionManager.setCurrentLevel(levelId);
-              const puzzleResult = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[levelId]);
+            isOpen={showLevelMap}
+            onLevelSelect={(level) => {
+              console.log('Level selected:', level);
+              setComplexityLevel(level);
+              const puzzleResult = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[level]);
               setPuzzleDots(puzzleResult.dots);
               setValidatedSolution(puzzleResult.solution);
               resetGame();
             }}
             currentLevel={complexityLevel}
             onClose={() => setShowLevelMap(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Achievements Modal */}
-      <AnimatePresence>
-        {showAchievements && (
-          <AchievementsModal
-            isOpen={showAchievements}
-            onClose={() => setShowAchievements(false)}
           />
         )}
       </AnimatePresence>
