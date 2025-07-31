@@ -8,6 +8,8 @@ import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetec
 import soundManager from '../utils/soundManager';
 import { triggerVictoryConfetti, PulseEffect } from '../utils/visualEffects';
 import progressionManager from '../utils/progressionManager';
+import LevelMap from './LevelMap';
+
 // Enhanced modules (keep for backend improvements only)
 import GameEngine, { GameConfiguration, FeedbackGrade } from '../utils/gameEngine';
 import PatternGenerator from '../utils/patternGenerator';
@@ -90,6 +92,9 @@ export const PuzzleGame: React.FC = () => {
   });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [validatedSolution, setValidatedSolution] = useState<string[]>(initialPuzzleState.solution); // Store the validated solution from puzzle generation
+  const [pathHistory, setPathHistory] = useState<Path[][]>([]); // Store history of path states for undo
+  const [redoHistory, setRedoHistory] = useState<Path[][]>([]); // Store history of path states for redo
+  const [showLevelMap, setShowLevelMap] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const [startTime, setStartTime] = useState<number>(0);
   const [moveCount, setMoveCount] = useState(0);
@@ -168,6 +173,73 @@ export const PuzzleGame: React.FC = () => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000); // Auto-hide after 3 seconds
   }, []);
+
+  // Save path state to history for undo functionality
+  useEffect(() => {
+    // Only save to history if we have actual paths and we're not in the middle of an undo/redo operation
+    if (paths.length >= 0) {
+      setPathHistory(prev => [...prev, [...paths]]);
+      setRedoHistory([]); // Clear redo history when new action is taken
+      console.log('Saved state to history. Paths count:', paths.length);
+    }
+  }, [paths]);
+
+  const undoLastPath = useCallback(() => {
+    if (pathHistory.length === 0) {
+      showNotification('Nothing to undo!', 'info');
+      return;
+    }
+
+    console.log('Undoing. History length:', pathHistory.length, 'Current paths:', paths.length);
+
+    // Get the previous state
+    const previousState = pathHistory[pathHistory.length - 1];
+    
+    // Save current state to redo history
+    setRedoHistory(prev => [...prev, [...paths]]);
+    
+    // Remove last item from undo history
+    setPathHistory(prev => prev.slice(0, -1));
+    
+    // Restore previous state
+    setPaths(previousState);
+    setCurrentPath([]);
+    setIsDrawing(false);
+    setCursorPos(null);
+    
+    // Show notification
+    showNotification(`🔙 Undid last action`, 'info');
+    
+    console.log('Undid path. Restored to paths count:', previousState.length);
+  }, [pathHistory, paths, showNotification]);
+
+  const redoLastPath = useCallback(() => {
+    if (redoHistory.length === 0) {
+      showNotification('Nothing to redo!', 'info');
+      return;
+    }
+
+    console.log('Redoing. Redo history length:', redoHistory.length, 'Current paths:', paths.length);
+
+    // Get the next state
+    const nextState = redoHistory[redoHistory.length - 1];
+    
+    // Save current state to undo history
+    setPathHistory(prev => [...prev, [...paths]]);
+    
+    // Remove last item from redo history
+    setRedoHistory(prev => prev.slice(0, -1));
+    
+    // Restore next state
+    setPaths(nextState);
+    setCurrentPath([]);
+    setIsDrawing(false);
+    setCursorPos(null);
+    
+    showNotification(`🔄 Redid last action`, 'info');
+    
+    console.log('Redid path. Restored to paths count:', nextState.length);
+  }, [redoHistory, paths, showNotification]);
 
   // Helper function to find the next dot in the solution path
   const findNextDotInSolution = useCallback((solution: string[], currentIndex: number, dots: any[]) => {
@@ -1001,6 +1073,30 @@ export const PuzzleGame: React.FC = () => {
     }
   }, [puzzleDots, validatedSolution, complexityLevel, currentComplexity]);
 
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameState === GAME_STATE.WON) return;
+      
+      // Ctrl+Z for undo
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undoLastPath();
+      }
+      
+      // Ctrl+Y or Ctrl+Shift+Z for redo
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'Z')) {
+        e.preventDefault();
+        redoLastPath();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [gameState, undoLastPath, redoLastPath]);
+
   return (
     <div 
       className="w-full min-h-screen bg-gradient-main p-2 relative overflow-hidden game-area"
@@ -1046,12 +1142,41 @@ export const PuzzleGame: React.FC = () => {
               <span className="move-counter">• {moveCount} moves</span>
             </div>
           </div>
-          {/* Controls - Minimal Clean Interface */}
+          {/* Controls - 4 Main Buttons */}
           <div className="controls-grid">
             <button onClick={resetGame} className="control-button reset">
                 <ReplayIcon className="icon-sm" />
                 <span className="hidden-sm">Reset</span>
                 <span className="sm:hidden">↻</span>
+            </button>
+            <button 
+              onClick={undoLastPath}
+              disabled={pathHistory.length === 0}
+              className={`control-button ${pathHistory.length === 0 ? 'undo disabled' : 'undo'}`}
+            >
+                <span className="text-xs">🔙</span>
+                <span className="hidden-sm">Undo</span>
+            </button>
+            <button 
+              onClick={() => {
+                setComplexityLevel(0);
+                const puzzleResult = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]);
+                setPuzzleDots(puzzleResult.dots);
+                setValidatedSolution(puzzleResult.solution);
+                resetGame();
+                showNotification('🔄 Progress reset! Back to Stage 1', 'info');
+              }}
+              className="control-button reset-progress"
+            >
+                <span className="text-xs">🔄</span>
+                <span className="hidden-sm">Reset All</span>
+            </button>
+            <button 
+              onClick={() => setShowLevelMap(true)}
+              className="control-button level-map"
+            >
+                <span className="text-xs">🗺️</span>
+                <span className="hidden-sm">Progress</span>
             </button>
           </div>
         </div>
@@ -1266,6 +1391,25 @@ export const PuzzleGame: React.FC = () => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Level Map Modal */}
+      <AnimatePresence>
+        {showLevelMap && (
+          <LevelMap
+            isOpen={showLevelMap}
+            onLevelSelect={(level) => {
+              console.log('Level selected:', level);
+              setComplexityLevel(level);
+              const puzzleResult = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[level]);
+              setPuzzleDots(puzzleResult.dots);
+              setValidatedSolution(puzzleResult.solution);
+              resetGame();
+            }}
+            currentLevel={complexityLevel}
+            onClose={() => setShowLevelMap(false)}
+          />
         )}
       </AnimatePresence>
     </div>
