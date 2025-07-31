@@ -27,7 +27,11 @@ export default defineConfig({
         entryFileNames: 'assets/js/[name].[hash].js'
       },
       // Tree shake unused imports
-      treeshake: true
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false
+      }
     },
     // Target modern browsers for better performance
     target: 'es2020',
@@ -37,7 +41,15 @@ export default defineConfig({
       compress: {
         drop_console: true, // Remove console.logs in production
         drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug']
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+        passes: 2,
+        unsafe_arrows: true,
+        unsafe_methods: true,
+        unsafe_proto: true,
+        unsafe_regexp: true
+      },
+      mangle: {
+        safari10: true
       },
       format: {
         comments: false
@@ -46,7 +58,13 @@ export default defineConfig({
     // Optimize chunk size warnings
     chunkSizeWarningLimit: 1000,
     // Enable source maps for debugging (but exclude from bundle)
-    sourcemap: false
+    sourcemap: false,
+    // Add compression and optimization
+    cssCodeSplit: false, // Inline CSS for better performance
+    reportCompressedSize: true,
+    // Additional optimizations
+    assetsInlineLimit: 4096, // Inline assets smaller than 4KB
+    emptyOutDir: true
   },
   // Facebook Instant Games CSP requirements
   server: {

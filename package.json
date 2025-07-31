@@ -6,13 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:optimized": "vite build && node scripts/optimize-build.mjs",
+    "preview": "vite preview",
+    "analyze": "npm run build && node scripts/optimize-build.mjs"
   },
   "dependencies": {
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/howler": "^2.2.12",
     "axios": "^1.10.0",
+    "canvas-confetti": "^1.9.3",
     "docx": "^9.5.1",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.0",
+    "howler": "^2.2.4",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "lodash": "^4.17.21",

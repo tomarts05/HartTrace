@@ -811,6 +811,162 @@ body::before {
 
 
 
+/* Enhanced Controls Styles */
+.control-button.level-map {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+}
+
+.control-button.level-map:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  transform: translateY(-1px);
+}
+
+.control-button.achievements {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.control-button.achievements:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+}
+
+.control-button.sound.enabled {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.control-button.sound.disabled {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: white;
+}
+
+.control-button.sound:hover {
+  transform: translateY(-1px);
+}
+
+/* Move counter styles */
+.timer-container .move-counter {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .timer-container .move-counter {
+    display: block;
+    margin-left: 0;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Victory pulse animation */
+.victory-pulse {
+  animation: victoryPulse 0.6s ease-in-out;
+}
+
+@keyframes victoryPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); filter: hue-rotate(20deg); }
+  100% { transform: scale(1); }
+}
+
+/* Confetti container */
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Enhanced tip path animation */
+.tip-path-animated {
+  animation: tipPathMove 2s linear infinite;
+}
+
+@keyframes tipPathMove {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 20; }
+}
+
+/* Modal backdrop improvements */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Level progress indicators */
+.level-progress-bar {
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 9999px;
+  height: 8px;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Achievement progress */
+.achievement-progress {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 9999px;
+  height: 6px;
+  transition: width 0.8s ease-out;
+}
+
+/* Enhanced button states */
+.control-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.control-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.control-button:disabled:hover {
+  transform: none !important;
+}
+
+/* Sound wave animation for enabled sound */
+.control-button.sound.enabled::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: soundWave 1s ease-in-out infinite;
+}
+
+@keyframes soundWave {
+  0%, 100% { transform: translateY(-50%) scale(1); opacity: 1; }
+  50% { transform: translateY(-50%) scale(1.5); opacity: 0.5; }
+}
+
+/* Performance enhancements */
+.game-board {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Mobile touch improvements */
+@media (hover: none) and (pointer: coarse) {
+  .control-button:hover {
+    transform: none;
+  }
+  
+  .control-button:active {
+    transform: scale(0.95);
+  }
+}
+
 /* Essential responsive utilities */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
