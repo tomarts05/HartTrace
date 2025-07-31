@@ -665,6 +665,26 @@ export const PuzzleGame: React.FC = () => {
           console.log('Cleared tip on drawing start');
         }
         setIsDrawing(true);
+        
+        // Set initial cursor position for immediate feedback when continuing from existing dot
+        if (svgRef.current) {
+          try {
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = point.clientX - rect.left;
+            const y = point.clientY - rect.top;
+            
+            const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
+            const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
+            
+            const svgX = (x / rect.width) * svgWidth;
+            const svgY = (y / rect.height) * svgHeight;
+            
+            setCursorPos({ x: svgX, y: svgY });
+            console.log('🎯 Initial cursor position set for continuing path:', { svgX, svgY });
+          } catch (error) {
+            console.warn('Error setting initial cursor position for continuing path:', error);
+          }
+        }
         return;
       }
       
