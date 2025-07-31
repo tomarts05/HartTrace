@@ -879,6 +879,25 @@ export const PuzzleGame: React.FC = () => {
       return;
     }
 
+    // Rule 3: Visit numbered cells in ascending order - Check if approaching wrong dot
+    const currentPathNum = paths.length + 1;
+    const nextExpectedDotNum = currentPathNum + 1;
+    
+    // Find if this cell contains any numbered dot
+    const dotAtCell = puzzleDots.find(dot => `${dot.row},${dot.col}` === cell);
+    
+    if (dotAtCell) {
+      // This cell has a numbered dot - check if it's the correct one
+      if (dotAtCell.num !== nextExpectedDotNum) {
+        // User is trying to approach wrong dot - block it
+        console.log(`❌ BLOCKED APPROACH: Cannot approach dot ${dotAtCell.num}, must reach dot ${nextExpectedDotNum} first`);
+        showNotification(`Connect dots in order! Next dot: ${nextExpectedDotNum}`, 'info');
+        return; // Block this move
+      }
+      // If it's the correct dot, allow the move to proceed
+      console.log(`✅ CORRECT APPROACH: Approaching dot ${dotAtCell.num} in correct order`);
+    }
+
     // Add the cell to the current path
     const newCurrentPath = [...currentPath, cell];
     setCurrentPath(newCurrentPath);
