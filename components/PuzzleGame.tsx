@@ -5,6 +5,11 @@ import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
 import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
+import soundManager from '../utils/soundManager';
+import { triggerVictoryConfetti, PulseEffect } from '../utils/visualEffects';
+import progressionManager from '../utils/progressionManager';
+import LevelMap from './LevelMap';
+import AchievementsModal from './AchievementsModal';
 
 type Path = { from: number; to: number; cells: string[] };
 
@@ -87,6 +92,28 @@ export const PuzzleGame: React.FC = () => {
   const [redoHistory, setRedoHistory] = useState<Path[][]>([]); // Store history of path states for redo
   const svgRef = useRef<SVGSVGElement>(null);
 
+  // Enhanced features state
+  const [showLevelMap, setShowLevelMap] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(!soundManager.isSoundMuted());
+  const [startTime, setStartTime] = useState<number>(0);
+  const [moveCount, setMoveCount] = useState(0);
+  const [showVictoryEffect, setShowVictoryEffect] = useState(false);
+  const [globalTimer, setGlobalTimer] = useState(0); // Track total play time
+  
+  // Initialize sound system
+  useEffect(() => {
+    soundManager.preloadSounds();
+  }, []);
+  
+  // Initialize progression from saved state
+  useEffect(() => {
+    const savedLevel = progressionManager.getCurrentLevel();
+    if (savedLevel !== complexityLevel && progressionManager.isLevelUnlocked(savedLevel)) {
+      setComplexityLevel(savedLevel);
+    }
+  }, []);
+
   const currentComplexity = COMPLEXITY_LEVELS[complexityLevel];
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
   const occupiedCells = useMemo(() => new Set(paths.flatMap(p => p.cells)), [paths]);
@@ -96,6 +123,7 @@ export const PuzzleGame: React.FC = () => {
     if (gameState === GAME_STATE.PLAYING) {
       interval = window.setInterval(() => {
         setTimer(prev => prev + 1);
+        setGlobalTimer(prev => prev + 1); // Track total play time
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -122,9 +150,17 @@ export const PuzzleGame: React.FC = () => {
     setRedoHistory([]); // Clear redo history
     setPuzzleDots(puzzleResult.dots); // Use the validated dots
     setPuzzleId(prev => prev + 1); // Force re-render with new puzzle ID
+    setMoveCount(0);
+    setStartTime(Date.now());
+    setShowVictoryEffect(false);
+    
+    // Play reset sound
+    if (soundEnabled) {
+      soundManager.playClick();
+    }
     
     console.log('🔄 RESET: State updated with new dots');
-  }, [currentComplexity]);
+  }, [currentComplexity, soundEnabled]);
 
   const showNotification = useCallback((message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
@@ -577,6 +613,10 @@ export const PuzzleGame: React.FC = () => {
 
     if (gameState === GAME_STATE.IDLE) {
       setGameState(GAME_STATE.PLAYING);
+      setStartTime(Date.now());
+      if (soundEnabled) {
+        soundManager.playClick();
+      }
     }
     
     const cell = getCellFromEvent(point);
@@ -624,6 +664,12 @@ export const PuzzleGame: React.FC = () => {
         }
         setIsDrawing(true);
         setCurrentPath(prev => [...prev, cell]);
+        setMoveCount(prev => prev + 1);
+        
+        // Play drawing sound
+        if (soundEnabled) {
+          soundManager.playDraw();
+        }
         return;
       }
     }
@@ -643,6 +689,12 @@ export const PuzzleGame: React.FC = () => {
       // Immediately set up drawing state for better responsiveness
       setCurrentPath([startDotCell]); // Always start with the dot cell
       setIsDrawing(true);
+      setMoveCount(prev => prev + 1);
+      
+      // Play click sound
+      if (soundEnabled) {
+        soundManager.playClick();
+      }
       
       // DEBUG: Log drawing start
       console.log('🎯 Drawing STARTED from dot', nextDotNumber, 'at cell', startDotCell, 'isDrawing:', true);
@@ -828,6 +880,11 @@ export const PuzzleGame: React.FC = () => {
       if (isLastDot && allCellsFilled) {
         console.log('🎉 WIN CONDITION TRIGGERED! All README.md rules satisfied');
         
+        // Calculate completion stats
+        const completionTime = timer;
+        const totalMoves = moveCount;
+        const isPerfectRun = true; // Could be enhanced to track mistakes
+        
         // Log completion event to Facebook
         fbActions.logEvent('stage_completed', complexityLevel + 1, {
           stage: complexityLevel + 1,
@@ -845,6 +902,34 @@ export const PuzzleGame: React.FC = () => {
             complexity: currentComplexity.description
           });
         }
+        
+        // Update progression system
+        const isFirstCompletion = progressionManager.completeLevel(
+          complexityLevel, 
+          completionTime, 
+          totalMoves, 
+          isPerfectRun
+        );
+        
+        // Update total play time
+        progressionManager.getPlayerStats().totalPlayTime = globalTimer;
+        
+        // Trigger victory effects
+        setShowVictoryEffect(true);
+        
+        // Play victory sound
+        if (soundEnabled) {
+          soundManager.playComplete();
+        }
+        
+        // Trigger confetti effect after a short delay
+        setTimeout(() => {
+          triggerVictoryConfetti({
+            particleCount: 150,
+            spread: 90,
+            origin: { y: 0.6 }
+          });
+        }, 200);
         
         showNotification(`🎉 Puzzle Solved! Stage ${complexityLevel + 1} Complete!`, 'success');
         setGameState(GAME_STATE.WON);
@@ -1279,10 +1364,11 @@ export const PuzzleGame: React.FC = () => {
               )}
             </div>
             
-            {/* Timer - Compact on Mobile */}
+            {/* Timer and Stats - Compact on Mobile */}
             <div className="timer-container">
               <ClockIcon className="icon-base"/>
               <span className="timer-time">{new Date(timer * 1000).toISOString().substr(14, 5)}</span>
+              <span className="move-counter">• {moveCount} moves</span>
             </div>
           </div>
           {/* Controls - Mobile Optimized Grid */}
@@ -1307,6 +1393,30 @@ export const PuzzleGame: React.FC = () => {
             >
                 <span className="text-xs">🔄</span>
                 <span className="hidden-sm">Redo</span>
+            </button>
+            <button 
+              onClick={() => setShowLevelMap(true)}
+              className="control-button level-map"
+            >
+                <span className="text-xs">🗺️</span>
+                <span className="hidden-sm">Levels</span>
+            </button>
+            <button 
+              onClick={() => setShowAchievements(true)}
+              className="control-button achievements"
+            >
+                <span className="text-xs">🏆</span>
+                <span className="hidden-sm">Awards</span>
+            </button>
+            <button 
+              onClick={() => {
+                const newSoundEnabled = soundManager.toggleMute();
+                setSoundEnabled(!newSoundEnabled);
+              }}
+              className={`control-button sound ${soundEnabled ? 'enabled' : 'disabled'}`}
+            >
+                <span className="text-xs">{soundEnabled ? '🔊' : '🔇'}</span>
+                <span className="hidden-sm">Sound</span>
             </button>
             <button 
               onClick={startNewGame}
@@ -1348,8 +1458,9 @@ export const PuzzleGame: React.FC = () => {
           </div>
         </div>
 
-        {/* Game Board - Mobile Responsive */}
-        <div className="game-board-container">
+        {/* Game Board - Mobile Responsive with Victory Effects */}
+        <PulseEffect trigger={showVictoryEffect}>
+          <div className="game-board-container">
           <svg
             ref={svgRef}
             className={`game-board puzzle-svg ${isDrawing ? 'drawing' : ''}`}
@@ -1481,6 +1592,7 @@ export const PuzzleGame: React.FC = () => {
             </defs>
           </svg>
         </div>
+        </PulseEffect>
         
         {/* Instructions - Mobile Optimized */}
         <div className="instructions">
@@ -1599,6 +1711,34 @@ export const PuzzleGame: React.FC = () => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Level Map Modal */}
+      <AnimatePresence>
+        {showLevelMap && (
+          <LevelMap
+            onLevelSelect={(levelId) => {
+              setComplexityLevel(levelId);
+              progressionManager.setCurrentLevel(levelId);
+              const puzzleResult = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[levelId]);
+              setPuzzleDots(puzzleResult.dots);
+              setValidatedSolution(puzzleResult.solution);
+              resetGame();
+            }}
+            currentLevel={complexityLevel}
+            onClose={() => setShowLevelMap(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Achievements Modal */}
+      <AnimatePresence>
+        {showAchievements && (
+          <AchievementsModal
+            isOpen={showAchievements}
+            onClose={() => setShowAchievements(false)}
+          />
         )}
       </AnimatePresence>
     </div>
