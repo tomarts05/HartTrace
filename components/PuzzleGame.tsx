@@ -68,6 +68,8 @@ export const PuzzleGame: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cursorPos, setCursorPos] = useState<{ x: number, y: number } | null>(null);
+  const penPathRef = useRef<{ x: number, y: number }[]>([]); // Use ref for performance
+  const [penPathUpdate, setPenPathUpdate] = useState(0); // Trigger for pen path updates
   const [timer, setTimer] = useState(0);
   const [complexityLevel, setComplexityLevel] = useState(0);
   const [puzzleId, setPuzzleId] = useState(0); // Add unique puzzle ID to force re-renders
@@ -268,33 +270,44 @@ export const PuzzleGame: React.FC = () => {
   }, [paths]);
 
   const undoLastPath = useCallback(() => {
-    if (pathHistory.length === 0) {
+    if (paths.length === 0 && currentPath.length === 0) {
       showNotification('Nothing to undo!', 'info');
       return;
     }
 
-    console.log('Undoing. History length:', pathHistory.length, 'Current paths:', paths.length);
+    console.log('Undoing last connection. Current paths:', paths.length, 'Current path:', currentPath.length);
 
-    // Get the previous state
-    const previousState = pathHistory[pathHistory.length - 1];
-    
-    // Save current state to redo history
-    setRedoHistory(prev => [...prev, [...paths]]);
-    
-    // Remove last item from undo history
-    setPathHistory(prev => prev.slice(0, -1));
-    
-    // Restore previous state
-    setPaths(previousState);
-    setCurrentPath([]);
-    setIsDrawing(false);
-    setCursorPos(null);
-    
-    // Show notification
-    showNotification(`🔙 Undid last action`, 'info');
-    
-    console.log('Undid path. Restored to paths count:', previousState.length);
-  }, [pathHistory, paths, showNotification]);
+    // If we're currently drawing (have a current path), just clear it
+    if (currentPath.length > 0) {
+      console.log('🔙 Undoing current drawing path');
+      setCurrentPath([]);
+      penPathRef.current = [];
+      setIsDrawing(false);
+      setCursorPos(null);
+      showNotification(`🔙 Cleared current drawing`, 'info');
+      return;
+    }
+
+    // If we have completed paths, undo the last one
+    if (paths.length > 0) {
+      const lastPath = paths[paths.length - 1];
+      console.log(`🔙 Undoing path from dot ${lastPath.from} to dot ${lastPath.to}`);
+      
+      // Remove the last path
+      setPaths(prev => prev.slice(0, -1));
+      
+      // Clear any current drawing state
+      setCurrentPath([]);
+      penPathRef.current = [];
+      setIsDrawing(false);
+      setCursorPos(null);
+      
+      // Show notification with specific path info
+      showNotification(`🔙 Undid connection ${lastPath.from} → ${lastPath.to}`, 'info');
+      
+      console.log('Undid last path. New paths count:', paths.length - 1);
+    }
+  }, [paths, currentPath, showNotification]);
 
   const redoLastPath = useCallback(() => {
     if (redoHistory.length === 0) {
@@ -699,6 +712,8 @@ export const PuzzleGame: React.FC = () => {
       
       // Immediately set up drawing state for better responsiveness
       setCurrentPath([startDotCell]); // Always start with the dot cell
+      const dotCenter = getCenterOfCell(startDotCell);
+      penPathRef.current = [dotCenter]; // Start pen path from dot center
       setIsDrawing(true);
       setMoveCount(prev => prev + 1);
       
@@ -797,6 +812,22 @@ export const PuzzleGame: React.FC = () => {
         
         // Store in ref for immediate access, batch state update
         cursorPosRef.current = { x: svgX, y: svgY };
+        
+        // Add point to pen path for smooth curve drawing (use ref for performance)
+        penPathRef.current.push({ x: svgX, y: svgY });
+        
+        // Keep only last N points for performance (optimized based on device capability)
+        const maxPenPoints = performanceMode === 'low' ? 15 : performanceMode === 'medium' ? 25 : 40;
+        if (penPathRef.current.length > maxPenPoints) {
+          penPathRef.current = penPathRef.current.slice(-maxPenPoints);
+        }
+        
+        // Throttle pen path updates for better performance
+        const penUpdateFrequency = performanceMode === 'low' ? 8 : performanceMode === 'medium' ? 6 : 4;
+        if (now - (penPathRef.current as any).lastUpdate >= (16 * penUpdateFrequency)) {
+          (penPathRef.current as any).lastUpdate = now;
+          setPenPathUpdate(prev => prev + 1);
+        }
         
         // Batch the cursor position update for rendering
         scheduleBatchedUpdate(() => {
@@ -1014,8 +1045,9 @@ export const PuzzleGame: React.FC = () => {
     setCursorPos(null);
     
     // Keep the current path for visual continuity and to allow continuing later
-    // Don't clear currentPath - this maintains the partial path on screen
-    console.log('Drawing ended, keeping current path for continuity');
+    // Clear pen path to start fresh for next drawing session
+    penPathRef.current = [];
+    console.log('Drawing ended, keeping current path for continuity, cleared pen path');
   }, [isDrawing]);
 
   useEffect(() => {
@@ -1032,6 +1064,38 @@ export const PuzzleGame: React.FC = () => {
       window.removeEventListener('touchend', handleInteractionEnd);
     };
   }, [handleInteractionMove, handleInteractionEnd]);
+
+  // Create smooth SVG path from pen movements
+  const createSmoothPath = useCallback((points: { x: number, y: number }[]) => {
+    if (points.length === 0) return "";
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+    
+    let path = `M ${points[0].x} ${points[0].y}`;
+    
+    for (let i = 1; i < points.length; i++) {
+      const curr = points[i];
+      
+      if (i === 1) {
+        // First line segment
+        path += ` L ${curr.x} ${curr.y}`;
+      } else {
+        // Use quadratic curves for smoothness
+        const next = points[i + 1];
+        if (next) {
+          const cpX = curr.x;
+          const cpY = curr.y;
+          const endX = (curr.x + next.x) / 2;
+          const endY = (curr.y + next.y) / 2;
+          path += ` Q ${cpX} ${cpY} ${endX} ${endY}`;
+        } else {
+          // Last point
+          path += ` L ${curr.x} ${curr.y}`;
+        }
+      }
+    }
+    
+    return path;
+  }, []);
 
   // Keyboard shortcuts for undo/redo
   // Optimized path data generation with pre-calculated cell positions
@@ -1052,24 +1116,13 @@ export const PuzzleGame: React.FC = () => {
   }, [getCachedCellPositions, getCenterOfCell]);
   
   // Optimized cursor line data with reduced recalculation
+  // Enhanced live cursor line for smooth pen-like drawing
   const cursorLineData = useMemo(() => {
-    if (!isDrawing || !cursorPos) return "";
+    if (!isDrawing || penPathRef.current.length === 0) return "";
     
-    if (currentPath.length === 0) {
-      return "";
-    }
-    
-    // Use cached cell position for better performance
-    const lastCellKey = currentPath[currentPath.length - 1];
-    const cellPositions = getCachedCellPositions();
-    const lastCell = cellPositions.get(lastCellKey);
-    
-    if (!lastCell || !cursorPos.x || !cursorPos.y) {
-      return "";
-    }
-    
-    return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
-  }, [isDrawing, cursorPos, currentPath, getCachedCellPositions]);
+    // Use the smooth pen path for natural drawing
+    return createSmoothPath(penPathRef.current);
+  }, [isDrawing, penPathUpdate, createSmoothPath]);
   
   // Memoized grid lines for better performance
   const gridLines = useMemo(() => {
@@ -1349,6 +1402,22 @@ export const PuzzleGame: React.FC = () => {
       
       {/* Game Container - Mobile First Design */}
       <div className="game-container">
+        {/* Game Title with Inline Logo */}
+        <div className="game-title">
+          <h1>
+            H
+            <picture>
+              <source srcSet="/hart-logo.webp" type="image/webp" />
+              <img 
+                src="/hart-logo.png" 
+                alt="a" 
+                className="inline-logo"
+              />
+            </picture>
+            rtTrace
+          </h1>
+        </div>
+        
         {/* Header Section - Mobile Optimized */}
         <div className="header-section">
           <div className="flex flex-col items-center gap-2">
@@ -1369,7 +1438,7 @@ export const PuzzleGame: React.FC = () => {
             <div className="timer-container">
               <ClockIcon className="icon-base"/>
               <span className="timer-time">{new Date(timer * 1000).toISOString().substr(14, 5)}</span>
-              <span className="move-counter">• {moveCount} moves</span>
+              <span className="move-counter">• Total: {new Date(globalTimer * 1000).toISOString().substr(14, 5)}</span>
             </div>
           </div>
           {/* Controls - 4 Main Buttons */}
@@ -1380,8 +1449,8 @@ export const PuzzleGame: React.FC = () => {
             </button>
             <button 
               onClick={undoLastPath}
-              disabled={pathHistory.length === 0}
-              className={`control-button ${pathHistory.length === 0 ? 'undo disabled' : 'undo'}`}
+              disabled={paths.length === 0 && currentPath.length === 0}
+              className={`control-button ${paths.length === 0 && currentPath.length === 0 ? 'undo disabled' : 'undo'}`}
             >
                 <span className="text-xs">🔙</span>
                 <span className="hidden-sm">Undo</span>
