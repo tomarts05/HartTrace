@@ -476,6 +476,45 @@ body {
   color: #e2e8f0;
   font-weight: 600;
   letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+/* Enhanced Timer States */
+.timer-time.timer-warning {
+  color: #fbbf24;
+  animation: pulse-warning 2s infinite;
+}
+
+.timer-time.timer-critical {
+  color: #ef4444;
+  animation: pulse-critical 1s infinite;
+}
+
+.time-limit {
+  opacity: 0.7;
+  font-size: 0.9em;
+  margin-left: 0.25rem;
+}
+
+.offline-indicator {
+  opacity: 0.8;
+  font-size: 0.9em;
+}
+
+.move-counter {
+  color: #94a3b8;
+  font-size: 0.9em;
+}
+
+/* Timer Warning Animations */
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes pulse-critical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .controls-grid {

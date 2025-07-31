@@ -11,6 +11,13 @@ import progressionManager from '../utils/progressionManager';
 import LevelMap from './LevelMap';
 import AchievementsModal from './AchievementsModal';
 
+// Enhanced modules
+import GameEngine, { GameConfiguration, FeedbackGrade } from '../utils/gameEngine';
+import PatternGenerator from '../utils/patternGenerator';
+import InputHandler from '../utils/inputHandler';
+import FeedbackRenderer from '../utils/feedbackRenderer';
+import serviceWorkerManager from '../utils/serviceWorkerManager';
+
 type Path = { from: number; to: number; cells: string[] };
 
 const GAME_STATE = {
@@ -101,10 +108,89 @@ export const PuzzleGame: React.FC = () => {
   const [showVictoryEffect, setShowVictoryEffect] = useState(false);
   const [globalTimer, setGlobalTimer] = useState(0); // Track total play time
   
+  // Enhanced game systems
+  const [gameEngine] = useState(() => new GameEngine());
+  const [patternGenerator] = useState(() => PatternGenerator.getInstance());
+  const [inputHandler] = useState(() => new InputHandler());
+  const [feedbackRenderer] = useState(() => new FeedbackRenderer());
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [currentGrade, setCurrentGrade] = useState<FeedbackGrade | null>(null);
+  const [offlineStatus, setOfflineStatus] = useState(false);
+  
   // Initialize sound system
   useEffect(() => {
     soundManager.preloadSounds();
   }, []);
+  
+  // Initialize enhanced game systems
+  useEffect(() => {
+    // Initialize service worker
+    serviceWorkerManager.register().then(success => {
+      if (success) {
+        console.log('✅ Service Worker initialized successfully');
+      }
+    });
+
+    // Setup service worker callbacks
+    serviceWorkerManager.onOfflineStatusChange((isOffline) => {
+      setOfflineStatus(isOffline);
+      if (isOffline) {
+        feedbackRenderer.showQuickFeedback('📴 You are now offline', 'info');
+      } else {
+        feedbackRenderer.showQuickFeedback('📶 Back online!', 'success');
+      }
+    });
+
+    // Setup game engine callbacks
+    gameEngine.setTimerCallbacks(
+      (timeLeft) => {
+        setTimeRemaining(timeLeft);
+        
+        // Show warnings at critical times
+        if (timeLeft === 30) {
+          feedbackRenderer.showTimeWarning(timeLeft, false);
+        } else if (timeLeft === 10) {
+          feedbackRenderer.showTimeWarning(timeLeft, true);
+        }
+      },
+      () => {
+        // Time expired
+        feedbackRenderer.showQuickFeedback('⏰ Time is up! Try again!', 'error');
+        setGameState(GAME_STATE.IDLE);
+      }
+    );
+
+    // Setup input handler callbacks
+    inputHandler.setCallbacks(
+      (cell) => {
+        // Valid move made
+        if (soundEnabled) {
+          soundManager.playClick();
+        }
+        inputHandler.triggerHapticFeedback('light');
+      },
+      (reason) => {
+        // Invalid move
+        feedbackRenderer.showQuickFeedback(reason, 'error');
+        if (soundEnabled) {
+          soundManager.playError?.();
+        }
+        inputHandler.triggerHapticFeedback('medium');
+      },
+      (drawingState) => {
+        // Drawing state changed
+        setCurrentPath(drawingState.currentPath);
+        setIsDrawing(drawingState.isDrawing);
+      }
+    );
+
+    return () => {
+      // Cleanup
+      gameEngine.stopGame();
+      inputHandler.reset();
+      feedbackRenderer.clearAllFeedback();
+    };
+  }, [soundEnabled]);
   
   // Initialize progression from saved state
   useEffect(() => {
@@ -118,7 +204,23 @@ export const PuzzleGame: React.FC = () => {
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
   const occupiedCells = useMemo(() => new Set(paths.flatMap(p => p.cells)), [paths]);
 
+  // Enhanced timer system using GameEngine
   useEffect(() => {
+    if (gameState === GAME_STATE.PLAYING) {
+      // Start game engine timer with progressive difficulty
+      const optimalMoveCount = totalCells; // Estimate optimal moves
+      gameEngine.startLevel(complexityLevel + 1, optimalMoveCount);
+      
+      // Set input tolerance based on level
+      const tolerance = gameEngine.getInputTolerance();
+      inputHandler.setTolerance(tolerance);
+      
+      console.log(`🎮 Started level ${complexityLevel + 1} with ${tolerance}px tolerance`);
+    } else {
+      gameEngine.stopGame();
+    }
+    
+    // Legacy timer for backward compatibility
     let interval: number;
     if (gameState === GAME_STATE.PLAYING) {
       interval = window.setInterval(() => {
@@ -127,10 +229,17 @@ export const PuzzleGame: React.FC = () => {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [gameState]);
+  }, [gameState, complexityLevel, totalCells]);
 
   const resetGame = useCallback(() => {
     console.log('🔄 RESET: Generating new puzzle...');
+    
+    // Stop and reset enhanced game systems
+    gameEngine.stopGame();
+    inputHandler.reset();
+    feedbackRenderer.clearAllFeedback();
+    setCurrentGrade(null);
+    setTimeRemaining(0);
     
     // Generate NEW random dots WITH validated solution
     const puzzleResult = generateRandomDotsWithSolution(currentComplexity);
@@ -160,7 +269,7 @@ export const PuzzleGame: React.FC = () => {
     }
     
     console.log('🔄 RESET: State updated with new dots');
-  }, [currentComplexity, soundEnabled]);
+  }, [currentComplexity, soundEnabled, gameEngine, inputHandler, feedbackRenderer]);
 
   const showNotification = useCallback((message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
@@ -1246,29 +1355,62 @@ export const PuzzleGame: React.FC = () => {
     if (allDotsConnected && allCellsFilled) {
       console.log('🎉 WIN CONDITION TRIGGERED by useEffect!');
       
-      // Log completion event to Facebook
+      // Stop game engine and calculate grade
+      gameEngine.stopGame();
+      const stats = gameEngine.getStats();
+      const pathAccuracy = inputHandler.calculatePathAccuracy();
+      const grade = gameEngine.calculateGrade(totalCells, pathAccuracy);
+      
+      console.log('📊 Game completion stats:', { stats, grade, pathAccuracy });
+      
+      // Store grade for display
+      setCurrentGrade(grade);
+      
+      // Show enhanced feedback
+      feedbackRenderer.showScoreDisplay({
+        grade,
+        stats,
+        showBreakdown: true,
+        animations: {
+          scoreReveal: { type: 'slide', duration: 500, easing: 'ease-out' },
+          gradeReveal: { type: 'bounce', duration: 600, easing: 'ease-out' },
+          bonusReveal: { type: 'pulse', duration: 400, easing: 'ease-out' }
+        }
+      });
+      
+      // Log completion event to Facebook with enhanced data
       fbActions.logEvent('stage_completed', complexityLevel + 1, {
         stage: complexityLevel + 1,
         time: timer,
         paths: paths.length,
-        complexity: currentComplexity.description
+        complexity: currentComplexity.description,
+        grade: grade.grade,
+        score: grade.score,
+        efficiency: stats.efficiency,
+        accuracy: pathAccuracy
       });
       
-      // Submit score to leaderboard if in Facebook
+      // Submit enhanced score to leaderboard if in Facebook
       if (fbState.isInitialized) {
-        const score = Math.max(1, 10000 - timer * 10);
-        fbActions.submitScore('main_leaderboard', score, {
+        const enhancedScore = Math.max(1, grade.score * 100 + (10000 - timer * 10));
+        fbActions.submitScore('main_leaderboard', enhancedScore, {
           stage: complexityLevel + 1,
           time: timer,
-          complexity: currentComplexity.description
+          complexity: currentComplexity.description,
+          grade: grade.grade,
+          efficiency: stats.efficiency.toFixed(1)
         });
       }
       
-      showNotification(`🎉 Puzzle Solved! Stage ${complexityLevel + 1} Complete!`, 'success');
+      // Legacy notification for compatibility
+      showNotification(`🎉 ${grade.grade}! Stage ${complexityLevel + 1} Complete!`, 'success');
       setGameState(GAME_STATE.WON);
       setCurrentPath([]);
       setIsDrawing(false);
       setCursorPos(null);
+      
+      // Reset input handler for next level
+      inputHandler.reset();
     }
   }, [paths, currentPath, gameState, puzzleDots.length, totalCells, complexityLevel, timer, currentComplexity, fbActions, fbState, showNotification]);
 
@@ -1364,11 +1506,19 @@ export const PuzzleGame: React.FC = () => {
               )}
             </div>
             
-            {/* Timer and Stats - Compact on Mobile */}
+            {/* Enhanced Timer and Stats - Compact on Mobile */}
             <div className="timer-container">
               <ClockIcon className="icon-base"/>
-              <span className="timer-time">{new Date(timer * 1000).toISOString().substr(14, 5)}</span>
+              <span className={`timer-time ${timeRemaining > 0 && timeRemaining <= 30 ? 'timer-warning' : ''} ${timeRemaining > 0 && timeRemaining <= 10 ? 'timer-critical' : ''}`}>
+                {new Date(timer * 1000).toISOString().substr(14, 5)}
+                {timeRemaining > 0 && gameEngine.shouldApplyTimePressure() && (
+                  <span className="time-limit">/{Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}</span>
+                )}
+              </span>
               <span className="move-counter">• {moveCount} moves</span>
+              {offlineStatus && (
+                <span className="offline-indicator">📴</span>
+              )}
             </div>
           </div>
           {/* Controls - Mobile Optimized Grid */}
