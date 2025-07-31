@@ -871,7 +871,23 @@ export const PuzzleGame: React.FC = () => {
       // Complete the current path to this dot
       const newPath: Path = { from: currentDotNum, to: nextDotNum, cells: [...newCurrentPath] };
       const newPaths = [...paths, newPath];
-      setPaths(newPaths);
+      // Batch all state updates together to prevent visual flicker
+      React.startTransition(() => {
+        setPaths(newPaths);
+        
+        // Continue drawing from this dot if there are more dots
+        if (nextDotNum < puzzleDots.length) {
+          // Rule 3: Visit numbered cells in ascending order
+          // Continue the path from this dot to maintain visual continuity
+          console.log('Continuing to draw from dot', nextDotNum, 'at cell', cell);
+          setCurrentPath([cell]); // Start next segment from this dot
+        } else {
+          console.log('All dots connected! Finishing drawing.');
+          setCurrentPath([]);
+          setIsDrawing(false);
+          setCursorPos(null);
+        }
+      });
       
       // Check if this was the last dot AND if all cells are filled
       const isLastDot = nextDotNum === puzzleDots.length;
@@ -1356,12 +1372,11 @@ export const PuzzleGame: React.FC = () => {
               <span className="move-counter">• {moveCount} moves</span>
             </div>
           </div>
-          {/* Controls - Enhanced Button Grid */}
+          {/* Controls - 4 Main Buttons */}
           <div className="controls-grid">
             <button onClick={resetGame} className="control-button reset">
                 <ReplayIcon className="icon-sm" />
                 <span className="hidden-sm">Reset</span>
-                <span className="sm:hidden">↻</span>
             </button>
             <button 
               onClick={undoLastPath}
@@ -1370,46 +1385,6 @@ export const PuzzleGame: React.FC = () => {
             >
                 <span className="text-xs">🔙</span>
                 <span className="hidden-sm">Undo</span>
-            </button>
-            <button 
-              onClick={redoLastPath}
-              disabled={redoHistory.length === 0}
-              className={`control-button ${redoHistory.length === 0 ? 'redo disabled' : 'redo'}`}
-            >
-                <span className="text-xs">🔄</span>
-                <span className="hidden-sm">Redo</span>
-            </button>
-            <button 
-              onClick={() => setShowLevelMap(true)}
-              className="control-button level-map"
-            >
-                <span className="text-xs">🗺️</span>
-                <span className="hidden-sm">Levels</span>
-            </button>
-            <button 
-              onClick={() => {
-                const newSoundEnabled = soundManager.toggleMute();
-                setSoundEnabled(!newSoundEnabled);
-              }}
-              className={`control-button sound ${soundEnabled ? 'enabled' : 'disabled'}`}
-            >
-                <span className="text-xs">{soundEnabled ? '🔊' : '🔇'}</span>
-                <span className="hidden-sm">Sound</span>
-            </button>
-            <button 
-              onClick={startNewGame}
-              className="control-button new"
-            >
-                <span className="text-xs">🎲</span>
-                <span className="hidden-sm">New</span>
-            </button>
-            <button 
-              onClick={showTipHandler}
-              disabled={gameState === GAME_STATE.WON}
-              className={`control-button ${gameState === GAME_STATE.WON ? 'tip disabled' : 'tip'}`}
-            >
-                <span className="text-xs">💡</span>
-                <span className="hidden-sm">Tip</span>
             </button>
             <button 
               onClick={() => {
@@ -1424,6 +1399,13 @@ export const PuzzleGame: React.FC = () => {
             >
                 <span className="text-xs">🔄</span>
                 <span className="hidden-sm">Reset All</span>
+            </button>
+            <button 
+              onClick={() => setShowLevelMap(true)}
+              className="control-button level-map"
+            >
+                <span className="text-xs">🗺️</span>
+                <span className="hidden-sm">Progress</span>
             </button>
           </div>
         </div>
