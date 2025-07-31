@@ -725,7 +725,7 @@ export const PuzzleGame: React.FC = () => {
       // DEBUG: Log drawing start
       console.log('🎯 Drawing STARTED from dot', nextDotNumber, 'at cell', startDotCell, 'isDrawing:', true);
       
-      // Set initial cursor position for immediate feedback
+      // Set initial cursor position for immediate feedback with enhanced visual feedback
       if (svgRef.current) {
         try {
           const rect = svgRef.current.getBoundingClientRect();
@@ -739,7 +739,7 @@ export const PuzzleGame: React.FC = () => {
           const svgY = (y / rect.height) * svgHeight;
           
           setCursorPos({ x: svgX, y: svgY });
-          console.log('🎯 Initial cursor position set:', { svgX, svgY });
+          console.log('🎯 Initial cursor position set with enhanced feedback:', { svgX, svgY });
         } catch (error) {
           console.warn('Error setting initial cursor position:', error);
         }
@@ -775,9 +775,9 @@ export const PuzzleGame: React.FC = () => {
   const handleInteractionMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDrawing) return;
     
-    // Throttle updates for better performance on mobile devices
+    // Throttle updates for better performance on mobile devices, but be less aggressive
     const now = performance.now();
-    if (now - lastUpdateRef.current < updateThrottle) return;
+    if (now - lastUpdateRef.current < 16) return; // 60fps cap instead of heavy throttling
     lastUpdateRef.current = now;
     
     // Only prevent default for mouse events, not touch events
@@ -788,51 +788,53 @@ export const PuzzleGame: React.FC = () => {
     const point = 'touches' in e ? e.touches[0] : e;
     if (!point) return;
 
-    // OPTIMIZED CONTINUOUS DRAWING: Use cached coordinate transform
+    // CONTINUOUS DRAWING: Always update cursor position for smooth pen-like drawing
+    // Update immediately for responsive drawing
     if (svgRef.current) {
       try {
-        const transform = getCachedCoordinateTransform();
+        const rect = svgRef.current.getBoundingClientRect();
         
-        // Ensure we have valid transform
-        if (!transform) {
+        // Ensure we have valid dimensions
+        if (rect.width === 0 || rect.height === 0) {
+          console.warn('SVG has zero dimensions, skipping cursor update');
           return;
         }
         
-        const x = point.clientX - transform.rect.left;
-        const y = point.clientY - transform.rect.top;
+        const x = point.clientX - rect.left;
+        const y = point.clientY - rect.top;
         
-        // Use cached scale factors for faster coordinate conversion
-        const svgX = x * transform.scaleX;
-        const svgY = y * transform.scaleY;
+        // Convert screen coordinates to SVG coordinates
+        const svgWidth = currentComplexity.gridSize * currentComplexity.cellSize;
+        const svgHeight = currentComplexity.gridSize * currentComplexity.cellSize;
+        
+        // Scale coordinates from screen space to SVG space
+        const svgX = (x / rect.width) * svgWidth;
+        const svgY = (y / rect.height) * svgHeight;
         
         // Validate coordinates are reasonable
         if (isNaN(svgX) || isNaN(svgY)) {
+          console.warn('Invalid cursor coordinates calculated:', { svgX, svgY, svgWidth, svgHeight });
           return;
         }
+
+        // DEBUG: Log cursor position updates
+        console.log('📍 Updating cursor position:', { svgX, svgY });
+
+        // IMMEDIATELY update cursor position for continuous line drawing
+        setCursorPos({ x: svgX, y: svgY });
         
-        // Store in ref for immediate access, batch state update
-        cursorPosRef.current = { x: svgX, y: svgY };
-        
-        // Add point to pen path for smooth curve drawing (use ref for performance)
+        // Also update pen path for smooth curve generation (for future enhancements)
         penPathRef.current.push({ x: svgX, y: svgY });
         
-        // Keep only last N points for performance (optimized based on device capability)
-        const maxPenPoints = performanceMode === 'low' ? 15 : performanceMode === 'medium' ? 25 : 40;
+        // Keep only last N points for performance
+        const maxPenPoints = 20;
         if (penPathRef.current.length > maxPenPoints) {
           penPathRef.current = penPathRef.current.slice(-maxPenPoints);
         }
         
-        // Throttle pen path updates for better performance
-        const penUpdateFrequency = performanceMode === 'low' ? 8 : performanceMode === 'medium' ? 6 : 4;
-        if (now - (penPathRef.current as any).lastUpdate >= (16 * penUpdateFrequency)) {
-          (penPathRef.current as any).lastUpdate = now;
-          setPenPathUpdate(prev => prev + 1);
-        }
+        // Update pen path trigger for smooth path rendering
+        setPenPathUpdate(prev => prev + 1);
         
-        // Batch the cursor position update for rendering
-        scheduleBatchedUpdate(() => {
-          setCursorPos({ x: svgX, y: svgY });
-        });
       } catch (error) {
         console.warn('Error setting cursor position:', error);
         return; // Exit early if coordinate calculation fails
@@ -1115,9 +1117,28 @@ export const PuzzleGame: React.FC = () => {
     }).join(' ');
   }, [getCachedCellPositions, getCenterOfCell]);
   
-  // Optimized cursor line data with reduced recalculation
   // Enhanced live cursor line for smooth pen-like drawing
   const cursorLineData = useMemo(() => {
+    if (!isDrawing || !cursorPos) return "";
+    
+    if (currentPath.length === 0) {
+      // If no path yet, don't show line (will start when first cell is added)
+      return "";
+    }
+    
+    // Always draw from the last cell in current path to cursor position
+    const lastCell = getCenterOfCell(currentPath[currentPath.length - 1]);
+    
+    // Ensure we have valid coordinates
+    if (!lastCell || !lastCell.x || !lastCell.y || !cursorPos.x || !cursorPos.y) {
+      return "";
+    }
+    
+    return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
+  }, [isDrawing, cursorPos, currentPath, getCenterOfCell]);
+  
+  // Enhanced pen path for smooth animation (keeping for future improvements)
+  const smoothPenPath = useMemo(() => {
     if (!isDrawing || penPathRef.current.length === 0) return "";
     
     // Use the smooth pen path for natural drawing
@@ -1507,51 +1528,78 @@ export const PuzzleGame: React.FC = () => {
                 />
               )}
               
-              {/* Live drawing cursor line - enhanced pen-like drawing */}
+              {/* Enhanced Live drawing cursor line with smooth animation */}
               {isDrawing && cursorPos && currentPath.length >= 1 && cursorLineData && (
-                <g className="cursor-line-glow">
+                <motion.g 
+                  className="cursor-line-glow"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.1 }}
+                >
                   {/* Background glow for pen effect */}
                   <path 
                     d={cursorLineData} 
                     stroke="#22d3ee" 
-                    strokeWidth="20" 
+                    strokeWidth="24" 
                     strokeLinecap="round" 
                     strokeLinejoin="round" 
                     fill="none" 
-                    opacity="0.2"
-                    filter="blur(2px)"
+                    opacity="0.15"
+                    filter="blur(3px)"
                   />
-                  {/* Outer glow */}
-                  <path 
+                  {/* Outer glow with pulsing effect */}
+                  <motion.path 
                     d={cursorLineData} 
                     stroke="#22d3ee" 
-                    strokeWidth="16" 
+                    strokeWidth="18" 
                     strokeLinecap="round" 
                     strokeLinejoin="round" 
                     fill="none" 
-                    opacity="0.4"
+                    opacity="0.3"
+                    animate={{ opacity: [0.3, 0.5, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                   />
-                  {/* Main cursor line */}
+                  {/* Main cursor line with enhanced gradient */}
                   <path 
                     d={cursorLineData} 
                     stroke="url(#path-gradient)" 
-                    strokeWidth="12" 
+                    strokeWidth="14" 
                     strokeLinecap="round" 
                     strokeLinejoin="round" 
                     fill="none" 
-                    opacity="0.9"
+                    opacity="0.95"
                   />
-                  {/* Inner highlight for pen shine effect */}
-                  <path 
+                  {/* Inner highlight with subtle animation */}
+                  <motion.path 
                     d={cursorLineData} 
                     stroke="#ffffff" 
-                    strokeWidth="4" 
+                    strokeWidth="6" 
                     strokeLinecap="round" 
                     strokeLinejoin="round" 
                     fill="none" 
-                    opacity="0.6"
+                    opacity="0.7"
+                    animate={{ opacity: [0.7, 0.9, 0.7] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                   />
-                </g>
+                  {/* Tip glow effect at cursor position */}
+                  <motion.circle
+                    cx={cursorPos.x}
+                    cy={cursorPos.y}
+                    r="8"
+                    fill="#22d3ee"
+                    opacity="0.4"
+                    animate={{ r: [6, 10, 6], opacity: [0.4, 0.7, 0.4] }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                  <circle
+                    cx={cursorPos.x}
+                    cy={cursorPos.y}
+                    r="4"
+                    fill="#ffffff"
+                    opacity="0.8"
+                  />
+                </motion.g>
               )}
               
               {/* Tip/Solution path - enhanced visibility with animation */}
