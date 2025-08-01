@@ -96,40 +96,8 @@ export const generateRandomDotsWithSolution = (
       // First dot always at start
       pathIndex = 0;
     } else if (i === numDots) {
-      // Last dot always at end (CRITICAL for game rules)
+      // Last dot MUST always be at end of solution path (CRITICAL for solvability)
       pathIndex = solutionPath.length - 1;
-      
-      // Special case: If this is the 9th dot, move it one step upward
-      if (i === 9) {
-        const lastCell = solutionPath[pathIndex];
-        const [lastRow, lastCol] = lastCell.split(',').map(Number);
-        
-        // Look for a position in the solution path that is one row higher (row - 1)
-        const targetRow = lastRow - 1;
-        if (targetRow >= 0) {
-          // Search for a cell in the solution path with the same column but one row higher
-          for (let j = solutionPath.length - 1; j >= 0; j--) {
-            const [row, col] = solutionPath[j].split(',').map(Number);
-            if (row === targetRow && col === lastCol) {
-              pathIndex = j;
-              console.log(`🎯 Moving 9th dot upward: from (${lastRow},${lastCol}) to (${row},${col}) at path index ${j}`);
-              break;
-            }
-          }
-          
-          // If same column not found, look for any cell one row higher
-          if (pathIndex === solutionPath.length - 1) {
-            for (let j = solutionPath.length - 1; j >= 0; j--) {
-              const [row, col] = solutionPath[j].split(',').map(Number);
-              if (row === targetRow) {
-                pathIndex = j;
-                console.log(`🎯 Moving 9th dot upward: from (${lastRow},${lastCol}) to (${row},${col}) at path index ${j} (different column)`);
-                break;
-              }
-            }
-          }
-        }
-      }
     } else {
       // Middle dots: simple even spacing for performance
       pathIndex = spacing * (i - 1);
