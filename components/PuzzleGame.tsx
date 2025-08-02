@@ -837,8 +837,10 @@ export const PuzzleGame: React.FC = () => {
           return;
         }
 
-        // DEBUG: Log cursor position updates
-        console.log('📍 Updating cursor position:', { svgX, svgY });
+        // DEBUG: Log cursor position updates (reduced logging for performance)
+        if (Math.random() < 0.1) { // Only log 10% of updates to reduce console spam
+          console.log('📍 Updating cursor position:', { svgX, svgY });
+        }
 
         // IMMEDIATELY update cursor position for continuous line drawing
         setCursorPos({ x: svgX, y: svgY });
@@ -862,10 +864,23 @@ export const PuzzleGame: React.FC = () => {
     }
     
     // SEPARATE LOGIC: Handle cell-based path updates only when entering new valid cells
-    if (currentPath.length === 0) return; // Need at least starting cell
-    
+    // For pencil-like drawing, we still need to handle initial cell selection
     const cell = getCellFromEvent(point);
     if (!cell) return; // Cursor might be outside grid
+    
+    // If no current path, check if we're starting from dot 1
+    if (currentPath.length === 0) {
+      const firstDot = puzzleDots.find(dot => dot.num === 1);
+      if (firstDot && cell === `${firstDot.row},${firstDot.col}`) {
+        // Starting from the correct first dot
+        console.log('✅ Starting path from dot 1');
+        setCurrentPath([cell]);
+        return;
+      } else {
+        // Not starting from dot 1, continue showing cursor line but don't add to path
+        return;
+      }
+    }
     
     const lastCellInPath = currentPath[currentPath.length - 1];
     if (cell === lastCellInPath) return; // Still in same cell
@@ -1156,25 +1171,38 @@ export const PuzzleGame: React.FC = () => {
     }).join(' ');
   }, [getCachedCellPositions, getCenterOfCell]);
   
-  // Enhanced live cursor line for smooth pen-like drawing
+  // Enhanced live cursor line for smooth pen-like drawing - PENCIL ANIMATION ENHANCEMENT
   const cursorLineData = useMemo(() => {
     if (!isDrawing || !cursorPos) return "";
     
+    // Enhanced pencil-like drawing: Show line from drawing start point or last valid cell
+    let startPoint: { x: number; y: number } | null = null;
+    
     if (currentPath.length === 0) {
-      // If no path yet, don't show line (will start when first cell is added)
+      // If no path yet, try to start from dot 1 position if we're near it
+      const firstDot = puzzleDots.find(dot => dot.num === 1);
+      if (firstDot) {
+        const firstDotCenter = getCenterOfCell(`${firstDot.row},${firstDot.col}`);
+        if (firstDotCenter) {
+          startPoint = firstDotCenter;
+        }
+      }
+    } else {
+      // Start from the last cell in current path
+      const lastCell = getCenterOfCell(currentPath[currentPath.length - 1]);
+      if (lastCell) {
+        startPoint = lastCell;
+      }
+    }
+    
+    // Ensure we have valid coordinates for both start and cursor
+    if (!startPoint || !startPoint.x || !startPoint.y || !cursorPos.x || !cursorPos.y) {
       return "";
     }
     
-    // Always draw from the last cell in current path to cursor position
-    const lastCell = getCenterOfCell(currentPath[currentPath.length - 1]);
-    
-    // Ensure we have valid coordinates
-    if (!lastCell || !lastCell.x || !lastCell.y || !cursorPos.x || !cursorPos.y) {
-      return "";
-    }
-    
-    return `M ${lastCell.x} ${lastCell.y} L ${cursorPos.x} ${cursorPos.y}`;
-  }, [isDrawing, cursorPos, currentPath, getCenterOfCell]);
+    // Create smooth line from start point to current cursor position
+    return `M ${startPoint.x} ${startPoint.y} L ${cursorPos.x} ${cursorPos.y}`;
+  }, [isDrawing, cursorPos, currentPath, getCenterOfCell, puzzleDots]);
   
   // Enhanced pen path for smooth animation (keeping for future improvements)
   const smoothPenPath = useMemo(() => {
@@ -1567,8 +1595,8 @@ export const PuzzleGame: React.FC = () => {
                 />
               )}
               
-              {/* Enhanced Live drawing cursor line with smooth animation */}
-              {isDrawing && cursorPos && currentPath.length >= 1 && cursorLineData && (
+              {/* Enhanced Live drawing cursor line with smooth animation - IMPROVED PENCIL EXPERIENCE */}
+              {isDrawing && cursorPos && cursorLineData && (
                 <motion.g 
                   className="cursor-line-glow"
                   initial={{ opacity: 0 }}
