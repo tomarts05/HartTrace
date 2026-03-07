@@ -4,16 +4,10 @@ import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution } from '../data/puzzl
 import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
-import { shouldReduceAnimations, getPerformanceMode } from '../utils/mobileDetection';
+import { shouldReduceAnimations } from '../utils/mobileDetection';
 import soundManager from '../utils/soundManager';
 import { triggerVictoryConfetti, PulseEffect } from '../utils/visualEffects';
 import progressionManager from '../utils/progressionManager';
-
-// Enhanced modules (keep for backend improvements only)
-import GameEngine, { GameConfiguration, FeedbackGrade } from '../utils/gameEngine';
-import PatternGenerator from '../utils/patternGenerator';
-import InputHandler from '../utils/inputHandler';
-import FeedbackRenderer from '../utils/feedbackRenderer';
 import serviceWorkerManager from '../utils/serviceWorkerManager';
 
 type Path = { from: number; to: number; cells: string[] };
@@ -32,7 +26,6 @@ interface PointEvent {
 export const PuzzleGame: React.FC = () => {
   // Performance optimization settings
   const reducedAnimations = shouldReduceAnimations();
-  const performanceMode = getPerformanceMode();
   const lastUpdateRef = useRef(0);
   
   // Enhanced performance caching for coordinate transformations
@@ -1083,12 +1076,12 @@ export const PuzzleGame: React.FC = () => {
           <div className="flex flex-col items-center gap-2">
             <div className="stage-info">
               <div className="stage-title">
-                <span className="stage-emoji">🏆</span>
                 <span className="stage-number">Stage {complexityLevel + 1}</span>
-                <span style={{ opacity: 0.6 }}> • {currentComplexity.description}</span>
+                <span className="stage-difficulty">{currentComplexity.difficulty}</span>
               </div>
+              <span className="stage-grid-info">{currentComplexity.gridSize}×{currentComplexity.gridSize} grid · {currentComplexity.numDots} dots</span>
               {fbState.isInitialized && fbState.playerName !== 'Player' && (
-                <span className="player-name">Playing as {fbState.playerName}</span>
+                <span className="player-name">{fbState.playerName}</span>
               )}
             </div>
             
