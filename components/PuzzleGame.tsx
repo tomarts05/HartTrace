@@ -620,7 +620,7 @@ export const PuzzleGame: React.FC = () => {
         updateCursorLine(dotCenter.x, dotCenter.y, coords.svgX, coords.svgY);
       }
     } else {
-      showNotification(`Tap dot ${nextDotNumber} to start`, 'info');
+      showNotification(`Start from dot ${nextDotNumber}`, 'info');
     }
   }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showNotification, currentPath, showTip, soundEnabled, getSVGCoords, getCenterOfCell, updateCursorLine]);
 
@@ -715,7 +715,7 @@ export const PuzzleGame: React.FC = () => {
     
     if (dotAtCell) {
       if (dotAtCell.num !== nextExpectedDotNum) {
-        showNotification(`Follow the sequence \u2014 next: ${nextExpectedDotNum}`, 'info');
+        showNotification(`Follow the sequence - next: ${nextExpectedDotNum}`, 'info');
         return;
       }
     }
@@ -1092,7 +1092,7 @@ export const PuzzleGame: React.FC = () => {
             </div>
           </div>
           {/* Controls - 4 Main Buttons: Reset, Undo, New, Hint */}
-          <div className="controls-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="controls-grid">
             <button onClick={resetGame} className="control-button reset">
                 <ReplayIcon className="icon-sm" />
                 <span className="hidden-sm">Reset</span>
@@ -1107,7 +1107,7 @@ export const PuzzleGame: React.FC = () => {
             </button>
             <button 
               onClick={startNewGame}
-              className="control-button reset-progress"
+              className="control-button new-puzzle"
             >
                 <span className="text-xs">✦</span>
                 <span className="hidden-sm">New</span>
