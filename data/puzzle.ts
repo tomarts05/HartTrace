@@ -59,13 +59,10 @@ export const validatePathAdjacency = (path: string[]): boolean => {
     const isAdjacent = (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
     
     if (!isAdjacent) {
-      console.error(`❌ Invalid move in path: ${path[i]} → ${path[i + 1]} (gap: ${rowDiff},${colDiff})`);
-      console.error('Path segment:', path.slice(Math.max(0, i - 2), i + 3));
       return false;
     }
   }
   
-  console.log('✅ Path adjacency validation: All moves are adjacent');
   return true;
 };
 
@@ -75,12 +72,6 @@ export const generateRandomDotsWithSolution = (
 ): PuzzleResult => {
   const { numDots, gridSize, patternType } = complexity;
   
-  console.log('🎯 Generating unique puzzle:', { 
-    numDots, 
-    gridSize, 
-    patternType,
-    totalCells: gridSize * gridSize 
-  });
 
   // Generate unique pattern based on stage
   const solutionPath = createPatternByType(gridSize, 0, 0, patternType);
@@ -110,7 +101,6 @@ export const generateRandomDotsWithSolution = (
     dots.push({ num: i, row, col });
   }
   
-  console.log(`✅ Generated ${patternType} puzzle with unique pattern`);
   return { 
     dots, 
     solution: solutionPath, // Backward compatibility
@@ -124,12 +114,9 @@ export const PUZZLE_DOTS = generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]).
 
 // Test function to demonstrate unique pattern progression
 export const testUniquePatterns = () => {
-  console.log('🎨🎨🎨 Testing UNIQUE pattern progression... 🎨🎨🎨');
   
   // Test all 12 stages to show unique pattern progression
   COMPLEXITY_LEVELS.forEach((level, index) => {
-    console.log(`\n🎯 === STAGE ${index + 1}: ${level.patternType.toUpperCase()} ===`);
-    console.log(`   Grid: ${level.gridSize}x${level.gridSize}, Dots: ${level.numDots}`);
     
     const result = generateRandomDotsWithSolution(level);
     const { dots, fullSolution } = result;
@@ -156,29 +143,16 @@ export const testUniquePatterns = () => {
     const complexityScore = directionChanges / Math.max(1, fullSolution.length - 1);
     const avgDotSpacing = fullSolution.length / dots.length;
     
-    console.log(`🎨 PATTERN ANALYSIS:`);
-    console.log(`   📊 Direction changes: ${directionChanges}/${fullSolution.length - 1} (${(complexityScore * 100).toFixed(1)}%)`);
-    console.log(`   🎯 Average dot spacing: ${avgDotSpacing.toFixed(1)} cells`);
-    console.log(`   ⚡ Pattern complexity: ${complexityScore.toFixed(3)}`);
-    console.log(`   🗺️  First 8 moves: ${fullSolution.slice(0, 8).join(' → ')}`);
-    console.log(`   🏁 Last 8 moves: ${fullSolution.slice(-8).join(' → ')}`);
-    console.log(`   🎯 Dot sequence: ${dots.map(d => `${d.num}:(${d.row},${d.col})`).join(' ')}`);
     
     // Verify movement validity (only horizontal/vertical)
     const isValid = validatePathAdjacency(fullSolution);
-    console.log(`   ✅ Movement validation: ${isValid ? 'VALID (horizontal/vertical only)' : 'INVALID'}`);
     
     if (complexityScore > 0.2) {
-      console.log(`   🏆 EXTREMELY UNIQUE PATTERN! (score > 0.2)`);
     } else if (complexityScore > 0.1) {
-      console.log(`   🔥 HIGHLY UNIQUE PATTERN (score > 0.1)`);
     } else {
-      console.log(`   ✨ Unique pattern: ${complexityScore.toFixed(3)}`);
     }
   });
   
-  console.log('\n🎨🎨🎨 UNIQUE PATTERN TESTING COMPLETE! 🎨🎨🎨');
-  console.log('🎮 Each stage now has a completely different pattern - no repeats!');
 };
 
 // ========================================
@@ -204,8 +178,6 @@ function createSimplePath(gridSize: number, _startRow: number, _startCol: number
     }
   }
   
-  console.log(`✅ BASIC SNAKE: ${path.length} cells - ROWS (left-right alternating)`);
-  console.log(`🎯 First 8 moves: ${path.slice(0, 8).join(' → ')}`);
   return path;
 }
 
@@ -228,8 +200,6 @@ function createZigzagPath(gridSize: number, _startRow: number, _startCol: number
     }
   }
   
-  console.log(`✅ DRAMATIC ZIGZAG: ${path.length} cells - VERTICAL COLUMNS (should be VERY different from snake)`);
-  console.log(`🎯 First 8 moves: ${path.slice(0, 8).join(' → ')}`);
   return path;
 }
 
@@ -269,8 +239,6 @@ function createSpiralPath(gridSize: number, _startRow: number, _startCol: number
     }
   }
   
-  console.log(`✅ DRAMATIC SPIRAL: ${path.length} cells - CLOCKWISE INWARD (should be VERY different from snake)`);
-  console.log(`🎯 First 8 moves: ${path.slice(0, 8).join(' → ')}`);
   return path;
 }
 
@@ -318,7 +286,6 @@ function createLShapePath(gridSize: number, _startRow: number, _startCol: number
     }
   }
   
-  console.log(`✅ True L-Shape pattern: ${path.length} cells - GENUINE L-SHAPED CHALLENGE`);
   return path;
 }
 
@@ -389,13 +356,11 @@ function createDiamondPath(gridSize: number, _startRow: number, _startCol: numbe
     }
   }
   
-  console.log(`✅ Fixed Diamond pattern: ${path.length} cells - DIAMOND WITH ADJACENCY PRESERVED`);
   return path;
 }
 
 // Stage 6: Cross Pattern (UNIQUE) - ADJACENCY-PRESERVING CROSS
 function createCrossPath(gridSize: number, _startRow: number, _startCol: number): string[] {
-  console.log(`🎨 Creating ADJACENCY-PRESERVING Cross pattern for ${gridSize}x${gridSize} grid`);
   
   const path: string[] = [];
   
@@ -416,7 +381,6 @@ function createCrossPath(gridSize: number, _startRow: number, _startCol: number)
     }
   }
   
-  console.log(`✅ ADJACENCY-PRESERVING Cross pattern: ${path.length} cells - CROSS WITH PROPER ADJACENCY`);
   return path;
 }
 
@@ -481,7 +445,6 @@ function createWavePath(gridSize: number, _startRow: number, _startCol: number):
     }
   }
   
-  console.log(`✅ Advanced Serpentine Wave: ${path.length} cells - COMPLEX WAVE WITH VERTICAL MOTION`);
   return path;
 }
 
@@ -559,7 +522,6 @@ function createUTurnPath(gridSize: number, _startRow: number, _startCol: number)
     layer++;
   }
   
-  console.log(`✅ Advanced Layered Spiral: ${path.length} cells - ALTERNATING CLOCKWISE/COUNTER-CLOCKWISE LAYERS`);
   return path;
 }
 
@@ -568,7 +530,6 @@ function createMazePath(gridSize: number, _startRow: number, _startCol: number):
   const path: string[] = [];
   const visited = new Set<string>();
   
-  console.log('🔥🔥🔥 Creating ULTIMATE MAZE CHALLENGE - 8x8 MASTER DIFFICULTY!');
   
   // PHASE 1: Create outer maze perimeter with gaps
   const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]]; // right, down, left, up
@@ -641,7 +602,6 @@ function createMazePath(gridSize: number, _startRow: number, _startCol: number):
   const startCol = Math.floor(Math.random() * gridSize);
   buildComplexMaze(startRow, startCol, 0);
   
-  console.log(`🎯 Phase 1: Complex recursive maze (${path.length} cells)`);
   
   // PHASE 2: Add zigzag connections between unvisited areas
   const zigzagMoves: string[] = [];
@@ -675,7 +635,6 @@ function createMazePath(gridSize: number, _startRow: number, _startCol: number):
   }
   
   path.push(...zigzagMoves);
-  console.log(`🎯 Phase 2: Zigzag connections (${zigzagMoves.length} new cells)`);
   
   // PHASE 3: Fill remaining with random walk pattern
   const randomWalkMoves: string[] = [];
@@ -729,7 +688,6 @@ function createMazePath(gridSize: number, _startRow: number, _startCol: number):
   }
   
   path.push(...randomWalkMoves);
-  console.log(`🎯 Phase 3: Random walk cleanup (${randomWalkMoves.length} new cells)`);
   
   // Emergency fill any remaining cells
   for (let row = 0; row < gridSize; row++) {
@@ -759,18 +717,6 @@ function createMazePath(gridSize: number, _startRow: number, _startCol: number):
   
   const complexityScore = directionChanges / Math.max(1, path.length - 1);
   
-  console.log(`🔥🔥🔥 ULTIMATE MAZE CHALLENGE COMPLETE: ${path.length} cells`);
-  console.log(`🎯 SUPER COMPLEX 3-PHASE MAZE PATTERN:`);
-  console.log(`   Phase 1: Recursive backtracking with spirals - MAXIMUM UNPREDICTABILITY`);
-  console.log(`   Phase 2: Multi-pass zigzag connections - COMPLEX LINKING`);
-  console.log(`   Phase 3: Random walk cleanup - CHAOTIC FILLING`);
-  console.log(`🔥 ULTIMATE DIFFICULTY ANALYSIS:`);
-  console.log(`   📊 Direction changes: ${directionChanges}/${path.length - 1} (${(complexityScore * 100).toFixed(1)}%)`);
-  console.log(`   🎯 Complexity score: ${complexityScore.toFixed(3)} (SHOULD BE HIGHEST OF ALL STAGES)`);
-  console.log(`   🏆 CHALLENGE LEVEL: ${complexityScore > 0.4 ? 'IMPOSSIBLE' : complexityScore > 0.3 ? 'INSANE' : 'EXTREME'}`);
-  console.log(`   🎮 This is the HARDEST possible pattern - combines maze + zigzag + random walk!`);
-  console.log(`🎯 First 10 moves: ${path.slice(0, 10).join(' → ')}`);
-  console.log(`🎯 Last 10 moves: ${path.slice(-10).join(' → ')}`);
   
   return path;
 }
@@ -849,7 +795,6 @@ function createFractalPath(gridSize: number, _startRow: number, _startCol: numbe
     }
   }
   
-  console.log(`✅ Fractal quadrant recursion: ${path.length} cells - RECURSIVE QUADRANT DIVISION`);
   return path;
 }
 
@@ -857,8 +802,6 @@ function createFractalPath(gridSize: number, _startRow: number, _startCol: numbe
 function createLabyrinthPath(gridSize: number, _startRow: number, _startCol: number): string[] {
   const path: string[] = [];
   
-  console.log('🔥🔥🔥 Creating ULTRA-COMPLEX LABYRINTH - SUPER HARD CHALLENGE!');
-  console.log(`🎯 Grid: ${gridSize}x${gridSize} (${gridSize * gridSize} cells) - MAXIMUM COMPLEXITY!`);
   
   // STRATEGY: Create a pattern that maximizes direction changes while guaranteeing adjacency
   // Use a complex traversal pattern that changes direction as often as possible
@@ -1033,7 +976,6 @@ function createLabyrinthPath(gridSize: number, _startRow: number, _startCol: num
     }
   }
   
-  console.log(`🎯 Phase 1: Ultra-complex traversal (${path.length} cells)`);
   
   // Calculate final complexity metrics
   let directionChanges = 0;
@@ -1052,16 +994,6 @@ function createLabyrinthPath(gridSize: number, _startRow: number, _startCol: num
   
   const complexityScore = directionChanges / Math.max(1, path.length - 1);
   
-  console.log(`🔥🔥🔥 ULTRA-COMPLEX LABYRINTH COMPLETE: ${path.length} cells`);
-  console.log(`🎯 SUPER HARD LABYRINTH PATTERN:`);
-  console.log(`   Phase 1: Ultra-complex traversal - MAXIMUM DIRECTION CHANGES WITH ADJACENCY`);
-  console.log(`🔥 ULTRA-COMPLEX DIFFICULTY ANALYSIS:`);
-  console.log(`   📊 Direction changes: ${directionChanges}/${path.length - 1} (${(complexityScore * 100).toFixed(1)}%)`);
-  console.log(`   🎯 Complexity score: ${complexityScore.toFixed(3)} (TARGET: >0.4 for SUPER HARD)`);
-  console.log(`   🏆 CHALLENGE LEVEL: ${complexityScore > 0.5 ? 'IMPOSSIBLE' : complexityScore > 0.4 ? 'SUPER HARD' : complexityScore > 0.3 ? 'VERY HARD' : 'HARD'}`);
-  console.log(`   🎮 This is the MOST COMPLEX labyrinth possible while maintaining solvability!`);
-  console.log(`🎯 First 12 moves: ${path.slice(0, 12).join(' → ')}`);
-  console.log(`🎯 Last 12 moves: ${path.slice(-12).join(' → ')}`);
   
   return path;
 }
@@ -1120,14 +1052,11 @@ function createComplexPath(gridSize: number, _startRow: number, _startCol: numbe
     }
   }
   
-  console.log(`✅ Manageable Complex Pattern: ${path.length} cells - DUAL DIRECTION SPIRAL`);
-  console.log(`🎯 First 8 moves: ${path.slice(0, 8).join(' → ')}`);
   return path;
 }
 
 // COMPREHENSIVE Pattern selection function - GUARANTEED UNIQUE PATTERNS
 function createPatternByType(gridSize: number, startRow: number, startCol: number, patternType: string): string[] {
-  console.log(`🎨 Creating ${patternType} pattern for ${gridSize}x${gridSize} grid`);
   
   // Generate GUARANTEED unique pattern based on type - NO FALLBACKS
   let pattern: string[] = [];
@@ -1183,18 +1112,14 @@ function createPatternByType(gridSize: number, startRow: number, startCol: numbe
       break;
       
     default:
-      console.warn(`Unknown pattern type: ${patternType}, using simple pattern`);
       pattern = createSimplePath(gridSize, startRow, startCol);
   }
   
   // SIMPLE validation - just ensure we have the right number of cells
   const expectedCells = gridSize * gridSize;
   if (pattern.length !== expectedCells) {
-    console.warn(`⚠️ Pattern ${patternType} has ${pattern.length} cells, expected ${expectedCells}. Using simple pattern.`);
     return createSimplePath(gridSize, startRow, startCol);
   }
   
-  console.log(`✅ Pattern ${patternType} generated successfully: ${pattern.length} cells`);
-  console.log(`🎯 First 8 moves: ${pattern.slice(0, 8).join(' → ')}`);
   return pattern;
 }
