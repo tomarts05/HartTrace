@@ -56,16 +56,13 @@ export const PuzzleGame: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [timer, setTimer] = useState(0);
   const [puzzleId, setPuzzleId] = useState(0);
-  // Initialize puzzle with solution - use saved level if available
-  const [initialPuzzleState] = useState(() => {
-    const savedLevel = progressionManager.getCurrentLevel();
-    const level = progressionManager.isLevelUnlocked(savedLevel) ? savedLevel : 0;
-    return generateRandomDotsWithSolution(COMPLEXITY_LEVELS[level]);
-  });
-  const [complexityLevel, setComplexityLevel] = useState(() => {
+  // Compute initial level once for consistency across state initializers
+  const [initialLevel] = useState(() => {
     const savedLevel = progressionManager.getCurrentLevel();
     return progressionManager.isLevelUnlocked(savedLevel) ? savedLevel : 0;
   });
+  const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[initialLevel]));
+  const [complexityLevel, setComplexityLevel] = useState(initialLevel);
   
   const [puzzleDots, setPuzzleDots] = useState(() => initialPuzzleState.dots);
   const [puzzleWalls, setPuzzleWalls] = useState<Set<string>>(() => new Set(initialPuzzleState.walls));
@@ -529,8 +526,8 @@ export const PuzzleGame: React.FC = () => {
   }, [currentComplexity]);
 
   // Interpolate a line of grid cells between two cells (Bresenham-style stepping)
-  // Returns array of cells from `from` (exclusive) to `to` (inclusive)
-  // Only returns orthogonal (horizontal/vertical) steps
+  // Returns array of cells from `from` to `to`, excluding `from` itself
+  // Only produces orthogonal (horizontal/vertical) steps
   const interpolateCells = useCallback((from: string, to: string): string[] => {
     const [r1, c1] = from.split(',').map(Number);
     const [r2, c2] = to.split(',').map(Number);
@@ -727,17 +724,21 @@ export const PuzzleGame: React.FC = () => {
     if (cell === lastCellInPath) return;
 
     // Handle backtracking first: if the cursor moves back onto a cell already in the path,
-    // trim the path to that cell (allows natural undo by retracing)
-    const cellIndexInPath = currentPath.indexOf(cell);
-    if (cellIndexInPath >= 0 && cellIndexInPath < currentPath.length - 1) {
-      setCurrentPath(prev => prev.slice(0, cellIndexInPath + 1));
-      return;
+    // or if any interpolated cell is in the path, trim to that cell (natural undo by retracing)
+    const intermediates = interpolateCells(lastCellInPath, cell);
+    const cellsToCheck = intermediates.length > 0 ? intermediates : [cell];
+    
+    // Check if any candidate cell triggers backtracking
+    for (const candidate of cellsToCheck) {
+      const idx = currentPath.indexOf(candidate);
+      if (idx >= 0 && idx < currentPath.length - 1) {
+        setCurrentPath(prev => prev.slice(0, idx + 1));
+        return;
+      }
     }
 
     // Build list of candidate cells to add (supports fast dragging via interpolation)
-    const intermediates = interpolateCells(lastCellInPath, cell);
-    // If the target cell is directly adjacent use it, otherwise use interpolated path
-    const cellsToAdd = intermediates.length > 0 ? intermediates : [cell];
+    const cellsToAdd = cellsToCheck;
     
     // Process each intermediate cell
     let workingPath = [...currentPath];

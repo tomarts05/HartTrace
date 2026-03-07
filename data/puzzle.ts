@@ -164,8 +164,7 @@ export const generateRandomDotsWithSolution = (
   const levelIndex = COMPLEXITY_LEVELS.indexOf(complexity);
   let wallCount = 0;
   if (levelIndex >= 2) {
-    // Start adding walls from stage 3 onwards, increasing with difficulty
-    // Scale: ~2 walls at stage 3, up to ~15+ at stage 12
+    // Walls start at stage 3 (index 2): 2 walls, scaling to 16 at stage 12 (index 11)
     wallCount = Math.floor((levelIndex - 1) * 1.5 + 1);
   }
   const walls = generateWalls(solutionPath, gridSize, wallCount);
