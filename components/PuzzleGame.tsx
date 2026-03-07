@@ -55,11 +55,17 @@ export const PuzzleGame: React.FC = () => {
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [timer, setTimer] = useState(0);
-  const [complexityLevel, setComplexityLevel] = useState(0);
   const [puzzleId, setPuzzleId] = useState(0);
-  
-  // Initialize puzzle with solution
-  const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]));
+  // Initialize puzzle with solution - use saved level if available
+  const [initialPuzzleState] = useState(() => {
+    const savedLevel = progressionManager.getCurrentLevel();
+    const level = progressionManager.isLevelUnlocked(savedLevel) ? savedLevel : 0;
+    return generateRandomDotsWithSolution(COMPLEXITY_LEVELS[level]);
+  });
+  const [complexityLevel, setComplexityLevel] = useState(() => {
+    const savedLevel = progressionManager.getCurrentLevel();
+    return progressionManager.isLevelUnlocked(savedLevel) ? savedLevel : 0;
+  });
   
   const [puzzleDots, setPuzzleDots] = useState(() => initialPuzzleState.dots);
   const [puzzleWalls, setPuzzleWalls] = useState<Set<string>>(() => new Set(initialPuzzleState.walls));
@@ -87,13 +93,7 @@ export const PuzzleGame: React.FC = () => {
     serviceWorkerManager.register();
   }, []);
   
-  // Initialize progression from saved state
-  useEffect(() => {
-    const savedLevel = progressionManager.getCurrentLevel();
-    if (savedLevel !== complexityLevel && progressionManager.isLevelUnlocked(savedLevel)) {
-      setComplexityLevel(savedLevel);
-    }
-  }, []);
+  // Initialize progression from saved state (handled in useState initializers above)
 
   const currentComplexity = COMPLEXITY_LEVELS[complexityLevel];
   const totalCells = currentComplexity.gridSize * currentComplexity.gridSize;
