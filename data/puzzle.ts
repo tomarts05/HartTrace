@@ -5,11 +5,15 @@ export interface Dot {
   col: number;
 }
 
+// Wall between two adjacent cells, stored as "row1,col1|row2,col2" (sorted)
+export type Wall = string;
+
 export interface PuzzleResult {
   dots: Dot[];
   solution?: string[]; // Keep for backward compatibility
   fullSolution: string[]; // New comprehensive solution
   gridSize: number; // Include grid size for complete puzzle data
+  walls: Wall[]; // Walls between cells that the path cannot cross
 }
 
 export interface ComplexityLevel {
@@ -66,6 +70,60 @@ export const validatePathAdjacency = (path: string[]): boolean => {
   return true;
 };
 
+// Create a canonical wall key between two adjacent cells (sorted for consistency)
+export const makeWallKey = (cellA: string, cellB: string): Wall => {
+  return cellA < cellB ? `${cellA}|${cellB}` : `${cellB}|${cellA}`;
+};
+
+// Check if a wall exists between two cells
+export const hasWall = (walls: Set<Wall>, cellA: string, cellB: string): boolean => {
+  return walls.has(makeWallKey(cellA, cellB));
+};
+
+// Generate walls that don't block the solution path
+// Walls are placed between adjacent cells where the solution path does NOT traverse
+const generateWalls = (solutionPath: string[], gridSize: number, wallCount: number): Wall[] => {
+  if (wallCount <= 0) return [];
+  
+  // Build set of edges used by the solution path
+  const solutionEdges = new Set<string>();
+  for (let i = 0; i < solutionPath.length - 1; i++) {
+    solutionEdges.add(makeWallKey(solutionPath[i], solutionPath[i + 1]));
+  }
+  
+  // Collect all possible wall positions (edges NOT used by solution)
+  const candidates: Wall[] = [];
+  for (let row = 0; row < gridSize; row++) {
+    for (let col = 0; col < gridSize; col++) {
+      const cell = `${row},${col}`;
+      // Right neighbor
+      if (col + 1 < gridSize) {
+        const right = `${row},${col + 1}`;
+        const key = makeWallKey(cell, right);
+        if (!solutionEdges.has(key)) {
+          candidates.push(key);
+        }
+      }
+      // Bottom neighbor
+      if (row + 1 < gridSize) {
+        const bottom = `${row + 1},${col}`;
+        const key = makeWallKey(cell, bottom);
+        if (!solutionEdges.has(key)) {
+          candidates.push(key);
+        }
+      }
+    }
+  }
+  
+  // Shuffle and pick up to wallCount walls
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  
+  return candidates.slice(0, Math.min(wallCount, candidates.length));
+};
+
 // Function to generate solvable puzzles with unique patterns per stage
 export const generateRandomDotsWithSolution = (
   complexity: ComplexityLevel
@@ -101,11 +159,23 @@ export const generateRandomDotsWithSolution = (
     dots.push({ num: i, row, col });
   }
   
+  // Generate walls based on difficulty - walls make the puzzle more challenging
+  // by restricting which adjacent cells can be connected
+  const levelIndex = COMPLEXITY_LEVELS.indexOf(complexity);
+  let wallCount = 0;
+  if (levelIndex >= 2) {
+    // Start adding walls from stage 3 onwards, increasing with difficulty
+    // Scale: ~2 walls at stage 3, up to ~15+ at stage 12
+    wallCount = Math.floor((levelIndex - 1) * 1.5 + 1);
+  }
+  const walls = generateWalls(solutionPath, gridSize, wallCount);
+  
   return { 
     dots, 
     solution: solutionPath, // Backward compatibility
     fullSolution: solutionPath,
-    gridSize
+    gridSize,
+    walls
   };
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution } from '../data/puzzle';
+import { COMPLEXITY_LEVELS, generateRandomDotsWithSolution, makeWallKey } from '../data/puzzle';
 import { ClockIcon } from './icons/ClockIcon';
 import { ReplayIcon } from './icons/ReplayIcon';
 import { useFBInstant } from '../hooks/useFBInstant';
@@ -62,6 +62,7 @@ export const PuzzleGame: React.FC = () => {
   const [initialPuzzleState] = useState(() => generateRandomDotsWithSolution(COMPLEXITY_LEVELS[0]));
   
   const [puzzleDots, setPuzzleDots] = useState(() => initialPuzzleState.dots);
+  const [puzzleWalls, setPuzzleWalls] = useState<Set<string>>(() => new Set(initialPuzzleState.walls));
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [validatedSolution, setValidatedSolution] = useState<string[]>(initialPuzzleState.solution);
   const [pathHistory, setPathHistory] = useState<Path[][]>([]);
@@ -225,6 +226,7 @@ export const PuzzleGame: React.FC = () => {
     setGameState(GAME_STATE.IDLE);
     setValidatedSolution(puzzleResult.solution);
     setPuzzleDots(puzzleResult.dots);
+    setPuzzleWalls(new Set(puzzleResult.walls));
     setPuzzleId(prev => prev + 1);
     setMoveCount(0);
     setStartTime(Date.now());
@@ -414,6 +416,7 @@ export const PuzzleGame: React.FC = () => {
     const puzzleResult = generateRandomDotsWithSolution(currentComplexity);
     
     setPuzzleDots(puzzleResult.dots);
+    setPuzzleWalls(new Set(puzzleResult.walls));
     setValidatedSolution(puzzleResult.solution);
     setPuzzleId(prev => prev + 1);
     
@@ -443,6 +446,7 @@ export const PuzzleGame: React.FC = () => {
         
         setComplexityLevel(nextLevel);
         setPuzzleDots(puzzleResult.dots);
+        setPuzzleWalls(new Set(puzzleResult.walls));
         setValidatedSolution(puzzleResult.solution);
         setPuzzleId(prev => prev + 1);
         setPaths([]);
@@ -524,6 +528,39 @@ export const PuzzleGame: React.FC = () => {
     return { svgX, svgY };
   }, [currentComplexity]);
 
+  // Interpolate a line of grid cells between two cells (Bresenham-style stepping)
+  // Returns array of cells from `from` (exclusive) to `to` (inclusive)
+  // Only returns orthogonal (horizontal/vertical) steps
+  const interpolateCells = useCallback((from: string, to: string): string[] => {
+    const [r1, c1] = from.split(',').map(Number);
+    const [r2, c2] = to.split(',').map(Number);
+    
+    if (r1 === r2 && c1 === c2) return [];
+    
+    const cells: string[] = [];
+    let cr = r1, cc = c1;
+    const maxSteps = Math.abs(r2 - r1) + Math.abs(c2 - c1);
+    
+    for (let step = 0; step < maxSteps; step++) {
+      // Move one step closer: prefer the axis with larger remaining distance
+      const dr = r2 - cr;
+      const dc = c2 - cc;
+      
+      if (Math.abs(dr) >= Math.abs(dc)) {
+        cr += dr > 0 ? 1 : -1;
+      } else {
+        cc += dc > 0 ? 1 : -1;
+      }
+      
+      const gs = currentComplexity.gridSize;
+      if (cr < 0 || cr >= gs || cc < 0 || cc >= gs) break;
+      
+      cells.push(`${cr},${cc}`);
+    }
+    
+    return cells;
+  }, [currentComplexity.gridSize]);
+
   const handleInteractionStart = useCallback((e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -580,8 +617,11 @@ export const PuzzleGame: React.FC = () => {
       // Rule 2: Connect adjacent cells (no diagonals)
       const isAdjacent = (rowDiff === 0 && colDiff === 1) || (rowDiff === 1 && colDiff === 0);
       
+      // Check wall between cells
+      const wallBlocked = isAdjacent && puzzleWalls.has(makeWallKey(lastCell, cell));
+      
       // Rule 5: Path cannot cross itself
-      if (isAdjacent && !currentPath.includes(cell) && !occupiedCells.has(cell)) {
+      if (isAdjacent && !wallBlocked && !currentPath.includes(cell) && !occupiedCells.has(cell)) {
         if (showTip) {
           setShowTip(false);
           setSolutionPath([]);
@@ -622,7 +662,7 @@ export const PuzzleGame: React.FC = () => {
     } else {
       showNotification(`Start from dot ${nextDotNumber}`, 'info');
     }
-  }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showNotification, currentPath, showTip, soundEnabled, getSVGCoords, getCenterOfCell, updateCursorLine]);
+  }, [gameState, paths, puzzleDots, getCellFromEvent, occupiedCells, showNotification, currentPath, showTip, soundEnabled, getSVGCoords, getCenterOfCell, updateCursorLine, puzzleWalls]);
 
   const handleInteractionMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDrawing) return;
@@ -686,140 +726,155 @@ export const PuzzleGame: React.FC = () => {
     const lastCellInPath = currentPath[currentPath.length - 1];
     if (cell === lastCellInPath) return;
 
-    // Rule 2: Connect adjacent cells (no diagonals) - optimized calculation
-    const lastCellParts = lastCellInPath.split(',');
-    const cellParts = cell.split(',');
-    const lastRow = parseInt(lastCellParts[0], 10);
-    const lastCol = parseInt(lastCellParts[1], 10);
-    const currRow = parseInt(cellParts[0], 10);
-    const currCol = parseInt(cellParts[1], 10);
-    
-    const rowDiff = Math.abs(lastRow - currRow);
-    const colDiff = Math.abs(lastCol - currCol);
-    
-    const isAdjacent = (rowDiff === 0 && colDiff === 1) || (rowDiff === 1 && colDiff === 0);
-
-    if (!isAdjacent) return;
-
-    // Rule 5: Path cannot cross itself
-    if (currentPath.includes(cell)) return;
-
-    const isOccupiedByCompletedPath = occupiedCells.has(cell);
-    if (isOccupiedByCompletedPath) return;
-
-    // Rule 3: Visit numbered cells in ascending order
-    const currentPathNum = paths.length + 1;
-    const nextExpectedDotNum = currentPathNum + 1;
-    
-    const dotAtCell = puzzleDots.find(dot => `${dot.row},${dot.col}` === cell);
-    
-    if (dotAtCell) {
-      if (dotAtCell.num !== nextExpectedDotNum) {
-        showNotification(`Follow the sequence - next: ${nextExpectedDotNum}`, 'info');
-        return;
-      }
-    }
-
-    const newCurrentPath = [...currentPath, cell];
-    setCurrentPath(newCurrentPath);
-    
-    if (showTip || solutionPath.length > 0) {
-      setShowTip(false);
-      setSolutionPath([]);
-    }
-
-    const currentDotNum = paths.length + 1;
-    const nextDotNum = currentDotNum + 1;
-    const nextDot = puzzleDots.find(d => d.num === nextDotNum);
-    
-    if (nextDot && cell === `${nextDot.row},${nextDot.col}`) {
-      saveToHistory();
-      
-      const newPath: Path = { from: currentDotNum, to: nextDotNum, cells: [...newCurrentPath] };
-      const newPaths = [...paths, newPath];
-      React.startTransition(() => {
-        setPaths(newPaths);
-        
-        if (nextDotNum < puzzleDots.length) {
-          setCurrentPath([cell]);
-        } else {
-          setCurrentPath([]);
-          setIsDrawing(false);
-          hideCursorLine();
-        }
-      });
-      
-      const isLastDot = nextDotNum === puzzleDots.length;
-      const allCellsAfterPath = new Set(newPaths.flatMap(p => p.cells));
-      const allCellsFilled = allCellsAfterPath.size === totalCells;
-      
-      if (isLastDot && allCellsFilled) {
-        const completionTime = timer;
-        const totalMoves = moveCount;
-        const isPerfectRun = true;
-        
-        fbActions.logEvent('stage_completed', complexityLevel + 1, {
-          stage: complexityLevel + 1,
-          time: timer,
-          paths: newPaths.length,
-          complexity: currentComplexity.description
-        });
-        
-        if (fbState.isInitialized) {
-          const score = Math.max(1, 10000 - timer * 10);
-          fbActions.submitScore('main_leaderboard', score, {
-            stage: complexityLevel + 1,
-            time: timer,
-            complexity: currentComplexity.description
-          });
-        }
-        
-        progressionManager.completeLevel(
-          complexityLevel, 
-          completionTime, 
-          totalMoves, 
-          isPerfectRun
-        );
-        
-        progressionManager.getPlayerStats().totalPlayTime = globalTimer;
-        
-        setShowVictoryEffect(true);
-        
-        if (soundEnabled) {
-          soundManager.playComplete();
-        }
-        
-        setTimeout(() => {
-          triggerVictoryConfetti({
-            particleCount: 150,
-            spread: 90,
-            origin: { y: 0.6 }
-          });
-        }, 200);
-        
-        showNotification('Puzzle solved!', 'success');
-        setGameState(GAME_STATE.WON);
-        setCurrentPath([]);
-        setIsDrawing(false);
-        hideCursorLine();
-        return;
-      }
-      
-      if (nextDotNum < puzzleDots.length) {
-        setCurrentPath([cell]);
-      } else {
-        setCurrentPath([]);
-        setIsDrawing(false);
-        hideCursorLine();
-      }
-      return;
-    }
-
-    // Handle backtracking (moving back one cell)
+    // Handle backtracking first: if the cursor moves back onto a cell already in the path,
+    // trim the path to that cell (allows natural undo by retracing)
     const cellIndexInPath = currentPath.indexOf(cell);
     if (cellIndexInPath >= 0 && cellIndexInPath < currentPath.length - 1) {
       setCurrentPath(prev => prev.slice(0, cellIndexInPath + 1));
       return;
+    }
+
+    // Build list of candidate cells to add (supports fast dragging via interpolation)
+    const intermediates = interpolateCells(lastCellInPath, cell);
+    // If the target cell is directly adjacent use it, otherwise use interpolated path
+    const cellsToAdd = intermediates.length > 0 ? intermediates : [cell];
+    
+    // Process each intermediate cell
+    let workingPath = [...currentPath];
+    let workingPaths = [...paths];
+    let pathChanged = false;
+    let victoryTriggered = false;
+    
+    for (const candidateCell of cellsToAdd) {
+      const lastCell = workingPath[workingPath.length - 1];
+      const [lastRow, lastCol] = lastCell.split(',').map(Number);
+      const [candRow, candCol] = candidateCell.split(',').map(Number);
+      
+      const rowDiff = Math.abs(lastRow - candRow);
+      const colDiff = Math.abs(lastCol - candCol);
+      const isAdjacent = (rowDiff === 0 && colDiff === 1) || (rowDiff === 1 && colDiff === 0);
+      
+      if (!isAdjacent) break;
+      
+      // Check wall between cells
+      if (puzzleWalls.has(makeWallKey(lastCell, candidateCell))) break;
+      
+      // Rule 5: Path cannot cross itself or enter occupied cells
+      if (workingPath.includes(candidateCell)) break;
+      
+      const isOccupiedByCompletedPath = occupiedCells.has(candidateCell);
+      if (isOccupiedByCompletedPath) break;
+      
+      // Rule 3: Visit numbered cells in ascending order
+      const currentPathNum = workingPaths.length + 1;
+      const nextExpectedDotNum = currentPathNum + 1;
+      
+      const dotAtCell = puzzleDots.find(dot => `${dot.row},${dot.col}` === candidateCell);
+      
+      if (dotAtCell && dotAtCell.num !== nextExpectedDotNum) {
+        // Wrong dot in sequence - stop here
+        break;
+      }
+      
+      workingPath = [...workingPath, candidateCell];
+      pathChanged = true;
+      
+      // Check if we've reached the next numbered dot
+      const nextDotNum = currentPathNum + 1;
+      const nextDot = puzzleDots.find(d => d.num === nextDotNum);
+      
+      if (nextDot && candidateCell === `${nextDot.row},${nextDot.col}`) {
+        // Complete this path segment
+        saveToHistory();
+        
+        const newPath: Path = { from: currentPathNum, to: nextDotNum, cells: [...workingPath] };
+        workingPaths = [...workingPaths, newPath];
+        
+        const isLastDot = nextDotNum === puzzleDots.length;
+        const allCellsAfterPath = new Set(workingPaths.flatMap(p => p.cells));
+        const allCellsFilled = allCellsAfterPath.size === totalCells;
+        
+        if (isLastDot && allCellsFilled) {
+          // VICTORY!
+          const completionTime = timer;
+          const totalMoves = moveCount;
+          const isPerfectRun = true;
+          
+          fbActions.logEvent('stage_completed', complexityLevel + 1, {
+            stage: complexityLevel + 1,
+            time: timer,
+            paths: workingPaths.length,
+            complexity: currentComplexity.description
+          });
+          
+          if (fbState.isInitialized) {
+            const score = Math.max(1, 10000 - timer * 10);
+            fbActions.submitScore('main_leaderboard', score, {
+              stage: complexityLevel + 1,
+              time: timer,
+              complexity: currentComplexity.description
+            });
+          }
+          
+          progressionManager.completeLevel(
+            complexityLevel, 
+            completionTime, 
+            totalMoves, 
+            isPerfectRun
+          );
+          
+          progressionManager.getPlayerStats().totalPlayTime = globalTimer;
+          
+          setShowVictoryEffect(true);
+          
+          if (soundEnabled) {
+            soundManager.playComplete();
+          }
+          
+          setTimeout(() => {
+            triggerVictoryConfetti({
+              particleCount: 150,
+              spread: 90,
+              origin: { y: 0.6 }
+            });
+          }, 200);
+          
+          showNotification('Puzzle solved!', 'success');
+          setPaths(workingPaths);
+          setGameState(GAME_STATE.WON);
+          setCurrentPath([]);
+          setIsDrawing(false);
+          hideCursorLine();
+          victoryTriggered = true;
+          break;
+        }
+        
+        // Continue to next segment
+        if (nextDotNum < puzzleDots.length) {
+          workingPath = [candidateCell];
+        } else {
+          workingPath = [];
+          break;
+        }
+      }
+    }
+    
+    if (victoryTriggered) return;
+    
+    if (pathChanged) {
+      if (showTip || solutionPath.length > 0) {
+        setShowTip(false);
+        setSolutionPath([]);
+      }
+      
+      if (workingPaths.length > paths.length) {
+        React.startTransition(() => {
+          setPaths(workingPaths);
+          setCurrentPath(workingPath);
+        });
+      } else {
+        setCurrentPath(workingPath);
+      }
     }
   }, [
     isDrawing,
@@ -843,7 +898,9 @@ export const PuzzleGame: React.FC = () => {
     solutionPath,
     moveCount,
     globalTimer,
-    soundEnabled
+    soundEnabled,
+    interpolateCells,
+    puzzleWalls
   ]);
 
   const handleInteractionEnd = useCallback(() => {
@@ -898,6 +955,48 @@ export const PuzzleGame: React.FC = () => {
       );
     });
   }, [currentComplexity.gridSize, currentComplexity.cellSize]);
+
+  // Memoized wall rendering - thick borders between cells the path cannot cross
+  const wallElements = useMemo(() => {
+    if (puzzleWalls.size === 0) return null;
+    const { cellSize } = currentComplexity;
+    const wallThickness = 4;
+    
+    return Array.from(puzzleWalls).map((wallKey) => {
+      const [cellA, cellB] = wallKey.split('|');
+      const [r1, c1] = cellA.split(',').map(Number);
+      const [r2, c2] = cellB.split(',').map(Number);
+      
+      let x1: number, y1: number, x2: number, y2: number;
+      
+      if (r1 === r2) {
+        // Horizontal neighbors: wall is vertical line between them
+        const col = Math.max(c1, c2);
+        x1 = col * cellSize;
+        y1 = r1 * cellSize;
+        x2 = col * cellSize;
+        y2 = (r1 + 1) * cellSize;
+      } else {
+        // Vertical neighbors: wall is horizontal line between them
+        const row = Math.max(r1, r2);
+        x1 = c1 * cellSize;
+        y1 = row * cellSize;
+        x2 = (c1 + 1) * cellSize;
+        y2 = row * cellSize;
+      }
+      
+      return (
+        <line
+          key={wallKey}
+          x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke="#f97316"
+          strokeWidth={wallThickness}
+          strokeLinecap="round"
+          className="pointer-events-none"
+        />
+      );
+    });
+  }, [puzzleWalls, currentComplexity]);
 
   const nextDot = puzzleDots[paths.length];
   
@@ -1135,6 +1234,9 @@ export const PuzzleGame: React.FC = () => {
           >
             {/* Grid Lines - Memoized for performance */}
             {gridLines}
+
+            {/* Walls - Thick borders between cells */}
+            {wallElements}
 
             {/* Drawn Paths */}
             <g className="pointer-events-none">
