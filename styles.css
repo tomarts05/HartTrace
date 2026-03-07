@@ -253,31 +253,32 @@ body::before {
 .stage-title {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
+  gap: 0.5rem;
+  padding: 0.375rem 0.875rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(147, 51, 234, 0.12) 100%);
   border-radius: 1.5rem;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.stage-emoji {
-  font-size: 1.25rem;
+  border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .stage-number {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #e2e8f0;
 }
 
-.stage-description {
-  font-size: 0.875rem;
-  color: #cbd5e1;
+.stage-difficulty {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 0.125rem 0.5rem;
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 0.75rem;
+}
+
+.stage-grid-info {
+  font-size: 0.75rem;
+  color: #64748b;
   text-align: center;
-  font-weight: 500;
 }
 
 .player-name {
@@ -361,17 +362,17 @@ body::before {
   color: #60a5fa;
 }
 
-/* Controls Grid - Simplified */
+/* Controls Grid */
 .controls-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-top: 1rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.75rem;
   width: 100%;
-  max-width: 320px;
+  max-width: 360px;
   margin-left: auto;
   margin-right: auto;
-  padding: 0.75rem;
+  padding: 0.5rem;
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.5) 0%, rgba(30, 41, 59, 0.3) 100%);
   border-radius: 0.75rem;
   border: 1px solid rgba(148, 163, 184, 0.1);
@@ -503,34 +504,25 @@ body::before {
   background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
 }
 
-.control-button.reset-progress { 
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  grid-column: span 2;
+.control-button.new-puzzle { 
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
 }
-.control-button.reset-progress:hover:not(:disabled) { 
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+.control-button.new-puzzle:hover:not(:disabled) { 
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .controls-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
-    padding: 0.5rem;
-  }
-  
-  .control-button.reset-progress {
-    grid-column: span 2;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.375rem;
+    padding: 0.375rem;
   }
 }
 
 @media (min-width: 641px) {
   .controls-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  
-  .control-button.reset-progress {
-    grid-column: span 1;
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
@@ -591,28 +583,6 @@ body::before {
 .instructions-end { color: #f87171; font-weight: 600; }
 .instructions-tip { color: #64748b; }
 
-/* Notification - Simplified */
-.notification {
-  position: fixed;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  color: white;
-  font-size: 0.875rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.notification.success { 
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%);
-}
-.notification.info { 
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.9) 0%, rgba(37, 99, 235, 0.9) 100%);
-}
-
 /* SVG optimizations */
 .game-svg {
   will-change: transform;
@@ -620,7 +590,7 @@ body::before {
 }
 
 .grid-lines {
-  color: rgba(100, 116, 139, 0.3);
+  color: rgba(100, 116, 139, 0.2);
   pointer-events: none;
 }
 
